@@ -64,6 +64,25 @@ per thread name.
 | Run | Build | frames/s | cores | CPU ms/frame | busiest threads (cores) |
 |---|---|---|---|---|---|
 | b-msvol | first build (-O3, MS volatile), vblank 60 Hz | 60.1 | 2.52 | 41.8 | main guest 822BDE68 0.95, GPU Commands 0.61, GPU Submission 0.26 |
+| g-cb1 | -O3, CB-1 (`-fno-ms-volatile` + compiler barriers), ring wait off | 60.7 | 2.37 | 39.0 | main guest 0.98, GPU Commands 0.58 |
+| g-cb1b | same, repeated | 55.3 | 2.28 | 41.3 | (Lavender running alongside) |
+| g-cb1ring | CB-1 + ring wait 1000 us + read pointer published every 1024 dwords (defaults) | 58.5 | **1.76** | **30.2** | GPU Commands 0.60, GPU Submission 0.25, **main guest 0.24** |
+| g-r250 | defaults, ring wait 250 us | 58.0 | 1.79 | 30.8 | |
+| g-pub256 | defaults, publish every 256 dwords | 50.9 | 1.56 | 30.7 | |
+
+Another ShiftGlue game was being benchmarked by another session at the same
+time, so frames per second varied between 51 and 61 across identical setups.
+CPU per frame held steady, so read the results from it:
+
+- **CB-1 is within noise.** 39.0 and 41.3 ms against 41.8. It stays on: it
+  matches how the Linux builds already compile, and the barriers keep the
+  ordering the game's `sync`/`lwsync` ask for.
+- **The ring-space wait (CB-32) saves about a quarter of the CPU.** CPU per
+  frame fell from 39-41 to 30-31 ms, and the game's main thread from 0.98 to
+  0.24 of a core. Its spin was most of that thread. The 1000 us timeout
+  stays: 250 us and more frequent read-pointer writebacks gained nothing.
+- **What's left is the GPU front end.** "GPU Commands" (PM4 decode) at 0.6
+  of a core and "GPU Submission" at 0.25 now make up half the process.
 
 ## The generated code was being compiled at -O0
 
