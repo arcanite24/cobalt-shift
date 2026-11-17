@@ -9,7 +9,7 @@ param(
     # Seconds to measure.
     [int]$Seconds = 60,
     # Seconds from launch to the first race's green light.
-    [int]$RaceWait = 205,
+    [int]$RaceWait = 215,
     # Seconds after the green light before measuring, for the field to leave.
     [int]$Settle = 15,
     # Drive at full throttle instead of sitting on the grid (not repeatable:
@@ -43,10 +43,11 @@ try {
         'A 200', 'wait 1500', 'A 200', 'wait 1500', 'START 200', 'wait 3000', 'START 200',
         'wait 20000', 'A 200',                               # title: Forza Motorsport 3
         'wait 15000', 'DOWN 200', 'wait 500', 'A 200',       # install Disc 2? NO
-        'wait 20000', 'A 200',                               # skip bonus content: YES
-        'wait 20000', 'A 200',                               # experience: Casual
-        'wait 15000', 'A 200', 'wait 8000', 'A 200', 'wait 8000', 'A 200', 'wait 3000', 'A 200'
-    ) -join "`n")
+        'wait 15000') +
+        # Then A every 2.5 s for 100 s: skip bonus content (YES), experience
+        # (Casual), the showcase, the flyover and the race intro, whatever
+        # their timing. Casual shifts automatically, so A does nothing on the grid.
+        @(1..40 | ForEach-Object { 'A 200'; 'wait 2300' }) -join "`n")
     if ($Throttle) { $Settle = 0 }
     $remaining = $RaceWait + $Settle - ((Get-Date) - $started).TotalSeconds
     if ($remaining -gt 0) { Start-Sleep -Seconds $remaining }

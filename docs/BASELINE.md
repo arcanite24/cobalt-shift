@@ -51,6 +51,34 @@ limit by default (`src/cobalt_shift_app.h`). A frame-time hook on FM3's main
 loop, as FM3-ReGPU's session 13 did, is how to keep 60 Hz and lose those
 misses.
 
+## Static grid route (from 2026-11-17)
+
+The throttle runs were not repeatable: mean draw calls were 1142, 1658 and
+1218 over three runs of the same configuration. `bench_race.ps1` now sits on
+the grid by default. It measures 60 s from 15 s after the green light, while
+the field drives off and the camera stays still. After the Disc 2 prompt it
+presses A every 2.5 s. Blind timings had left two runs stuck in the
+pre-race flyover, which FM3 caps at 30 fps. `tools/thread_cpu.ps1` adds CPU
+per thread name.
+
+| Run | Build | frames/s | cores | CPU ms/frame | busiest threads (cores) |
+|---|---|---|---|---|---|
+| b-msvol | first build (-O3, MS volatile), vblank 60 Hz | 60.1 | 2.52 | 41.8 | main guest 822BDE68 0.95, GPU Commands 0.61, GPU Submission 0.26 |
+
+## The generated code was being compiled at -O0
+
+The rebuild for CB-1 came out three times larger (`.text` 36 -> 103 MB). On
+the grid it used 4.1 cores at 52-54 fps, with or without CB-1, ring wait or
+read-pointer publishing. Two guest threads went from about 0.2 to 0.8 cores
+each. The generated units' ninja rules carried no `-O` flag. The SDK adds
+`-O3 -DNDEBUG` only in its own directory, and the build cache's
+`CMAKE_CXX_FLAGS_RELEASE` was empty. A disassembly sample shows 44 % of
+instructions touching the stack, against 1 % in the first build. The
+top-level `CMakeLists.txt` now sets the Release optimisation itself.
+
+Lavender Shift's current executable (built 2026-11-17 00:44) shows the same
+pattern: 43 % stack instructions and no `-O` on its generated units.
+
 ## Known rendering issues seen on the route
 
 - The 2D UI is scaled about 1.25x from the top-left corner. The Dolby splash

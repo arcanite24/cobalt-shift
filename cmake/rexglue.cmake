@@ -125,7 +125,7 @@ endif()
 # order stands: compiler barriers for the PPC barriers first, then this off
 # by default.
 option(COBALT_SHIFT_MS_VOLATILE
-    "Compile the generated units with MSVC volatile semantics (clang's Windows default)" ON)
+    "Compile the generated units with MSVC volatile semantics (clang's Windows default)" OFF)
 if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT MSVC AND NOT COBALT_SHIFT_MS_VOLATILE)
     list(APPEND REXGLUE_RECOMP_OPTIONS -fno-ms-volatile -DREX_PPC_COMPILER_BARRIERS)
 endif()

@@ -9,6 +9,17 @@ project(cobalt_shift LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# The SDK adds -O3 -DNDEBUG for Release only inside its own directory, so the
+# game's targets (the generated code above all) depend on
+# CMAKE_CXX_FLAGS_RELEASE. That cache entry was found empty, and the generated
+# code was compiled at -O0: .text 36 -> 103 MB, 44 % of instructions touching
+# the stack, 2.5 -> 4.1 cores on the race grid (docs/BASELINE.md). Set it
+# here so the build never depends on the cache.
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    add_compile_options($<$<CONFIG:Release>:-O3> $<$<CONFIG:Release>:-DNDEBUG>
+                        $<$<CONFIG:RelWithDebInfo>:-O2>)
+endif()
+
 # Stage 0 is a measuring build (--perf_log_csv), as Pinyon and Lavender's are.
 option(COBALT_SHIFT_PERF_COUNTERS "Compile ShiftGlue's per-frame perf counters" ON)
 if(COBALT_SHIFT_PERF_COUNTERS)

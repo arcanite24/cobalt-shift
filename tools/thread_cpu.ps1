@@ -24,7 +24,7 @@ public static class CobaltThreads {
     [DllImport("kernel32.dll")] static extern IntPtr LocalFree(IntPtr p);
     [DllImport("kernel32.dll")] static extern bool GetThreadTimes(IntPtr h, out long c, out long e, out long k, out long u);
     public static string Name(uint id) {
-        IntPtr h = OpenThread(0x1000 /* QUERY_LIMITED_INFORMATION */, false, id);
+        IntPtr h = OpenThread(0x0800 /* THREAD_QUERY_LIMITED_INFORMATION */, false, id);
         if (h == IntPtr.Zero) return null;
         try {
             IntPtr p;
@@ -36,7 +36,7 @@ public static class CobaltThreads {
     }
     // Kernel + user time in 100 ns units, or -1.
     public static long Cpu(uint id) {
-        IntPtr h = OpenThread(0x1000, false, id);
+        IntPtr h = OpenThread(0x0800, false, id);
         if (h == IntPtr.Zero) return -1;
         try {
             long c, e, k, u;
