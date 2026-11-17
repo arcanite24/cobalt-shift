@@ -20,6 +20,7 @@ include(cmake/rexglue.cmake)
 set(COBALT_SHIFT_SOURCES
     src/main.cpp
     src/utility_drive.cpp
+    src/pad_script.cpp
 )
 
 if(WIN32)

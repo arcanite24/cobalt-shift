@@ -6,6 +6,10 @@
 #include <rex/perf/counter.h>
 #include <rex/rex_app.h>
 
+#include <rex/input/input_system.h>
+#include <rex/runtime.h>
+
+#include "pad_script.h"
 #include "utility_drive.h"
 
 class CobaltShiftApp : public rex::ReXApp {
@@ -27,8 +31,11 @@ class CobaltShiftApp : public rex::ReXApp {
   }
 
   // FM3 streams replays to cache: (FM3-QUIRKS Q8).
+  // The scripted pad is added before any guest thread polls input.
   void OnPreLaunchModule() override {
     cobalt::MountUtilityDrive(runtime(), user_data_root());
+    cobalt::InstallPadScript(
+        static_cast<rex::input::InputSystem*>(runtime()->input_system()));
   }
 
   // --perf_log_csv=<path> writes one row of the SDK's counters per frame;

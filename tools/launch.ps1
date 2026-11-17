@@ -26,7 +26,8 @@ $UserRoot = (New-Item -ItemType Directory -Force -Path $UserRoot).FullName
 if (Get-Process -Name 'cobalt_shift' -ErrorAction SilentlyContinue) {
     throw 'cobalt_shift is already running.'
 }
-$arguments = @("--game_data_root=$disc", "--user_data_root=$UserRoot", '--gpu_backend=vulkan') +
+$arguments = @("--game_data_root=$disc", "--user_data_root=$UserRoot", '--gpu_backend=vulkan',
+    "--pad_script_file=$(Join-Path $UserRoot 'pad.txt')") +
     $GameArguments
 $arguments = @($arguments | ForEach-Object {
     if ($_ -match '[\s"]') { '"' + ($_ -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"' } else { $_ }
