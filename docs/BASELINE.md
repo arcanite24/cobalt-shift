@@ -405,6 +405,24 @@ turns it on. On multivac, grid route:
 The images match (`bench-capA.png`, `bench-capT.png`). The cap runs are
 noisy, but every untiled run used less CPU.
 
+### Menus cut untiled, and the 2X-only fix
+
+The menus showed it first: untiled, My Cars and Quick Upgrade lost
+everything below guest row 320 (the car, the stat bars, the lower half of
+dialogs), and stale background showed through. With
+`fh1_untile_predicated_tiling=false` they were whole. The race and the
+menus both tile in 256/256/208-row bands, but the race tiles a 2X MSAA
+surface (`RB_SURFACE_INFO` 0x14010500) and the menus and the garage's car
+tile at 4X (0x14020500). Drawing the later tiles as well
+(`fh1_debug_untile=2`) didn't fix the menus, so it is in the untiled
+surface's resolves, not in the skipped draws.
+
+The SDK's `fh1_untile_msaa_mask` (bit per guest MSAA mode) now picks which
+tilings are untiled; others keep their tiles. Cobalt sets it to 2 (2X
+only). My Cars is whole again. The race still skips about 740 later-tile
+draws a frame: 278 fps uncapped on the grid on multivac, the same image,
+and the whole HUD at 960x540.
+
 `src/render_rates.cpp` ports four of FM3-ReGPU's cuts, all hot-reloadable
 and off by default:
 
@@ -457,7 +475,8 @@ The UI lays out at 960x540, but two parts of the HUD went missing:
   the scene, and the game picks which band draws each element from its 720p
   position. The gear and speed fell outside the scaled bands they were drawn
   in. Drawing the scene once (`fh1_untile_predicated_tiling`, now the
-  default) draws the whole HUD in the first band, and they show.
+  default for the race's 2X tiling) draws the whole HUD in the first band,
+  and they show.
 - **Minimap:** it is the one element that sets its own viewport, through
   D3D's `SetViewport` (`sub_824B4068`, called from 0x827B5EF8), in 720p
   screen pixels: {63, 502, 193, 186}. D3D clips the viewport to the
