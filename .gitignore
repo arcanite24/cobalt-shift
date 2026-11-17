@@ -1,0 +1,16 @@
+# Game data never enters the repository
+*.iso
+*.xex
+*.xexp
+*.god
+*.stfs
+*.fxobj
+game/
+dump/
+generated/
+user/
+
+# Build output
+out/
+build/
+.local/
