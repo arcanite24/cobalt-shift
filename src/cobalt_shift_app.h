@@ -78,14 +78,17 @@ class CobaltShiftApp : public rex::ReXApp {
       }
     }
     // The low-end preset (cobalt_low_end). Pixel shader 8FEC358DC5728647 is
-    // a terrain detail layer (grass flowers, rock shading) drawn alpha-tested,
-    // so the UHD 620 shades every covered pixel with no early depth test: a
-    // third of its frame for a barely visible layer. Skipping it took the
-    // grid from 17.9 to 30.5 fps there. A positive mip LOD bias gained
-    // nothing and turns the road pink.
+    // a terrain detail layer (grass flowers, rock shading, flag cloth) drawn
+    // with alpha to coverage, which the SDK emulates with a kill in the
+    // shader, so the UHD 620 shades every covered pixel with no early depth
+    // test: a third of its frame. Skipping it took the grid from 17.9 to
+    // 30.5 fps there. A positive mip LOD bias gained nothing and turns the
+    // road pink. The SDK forces 4x anisotropic filtering; the game's own
+    // setting (-1) saved 7 % of the UHD 620's frame.
     if (REXCVAR_GET(cobalt_low_end)) {
       for (const auto& [name, value] :
-           {std::pair{"fh1_skip_pixel_shaders", "8FEC358DC5728647"}}) {
+           {std::pair{"fh1_skip_pixel_shaders", "8FEC358DC5728647"},
+            std::pair{"anisotropic_override", "-1"}}) {
         if (rex::cvar::GetFlagSource(name) == rex::cvar::Source::kDefault) {
           rex::cvar::SetFlagByName(name, value);
         }
