@@ -447,10 +447,39 @@ blindvac (UHD 620) with `cobalt_low_end`, parked on the grid, 30 s:
 | 960x540 | 44.3 (+36 %) | 18.0 / 33.5 / 33.8 | 1.98 |
 
 Frames land on one or two 60 Hz vblanks, so 540p alternates between 60
-and 30 fps here. The UI lays out at 960x540, but the minimap, the gear and
-the speed readout are missing: they come back only with the screen texture
-at renderer+480 (the scene colour target) left at 720p, which breaks the
-scene, so the HUD widgets likely live in that surface outside its top-left
-960x540. That has to be fixed before 540p can join the low-end preset.
-Diagnostics: `cobalt_scene_probe` logs the headers, `cobalt_scene_keep_mask`
-leaves chosen ones at 720p.
+and 30 fps here.
+
+### The HUD at 540p (fixed)
+
+The UI lays out at 960x540, but two parts of the HUD went missing:
+
+- **Gear and speed readout:** the HUD is drawn in the same two tile bands as
+  the scene, and the game picks which band draws each element from its 720p
+  position. The gear and speed fell outside the scaled bands they were drawn
+  in. Drawing the scene once (`fh1_untile_predicated_tiling`, now the
+  default) draws the whole HUD in the first band, and they show.
+- **Minimap:** it is the one element that sets its own viewport, through
+  D3D's `SetViewport` (`sub_824B4068`, called from 0x827B5EF8), in 720p
+  screen pixels: {63, 502, 193, 186}. D3D clips the viewport to the
+  960x540 target and derives the scissor from it, so the map was cut to a
+  strip at the bottom edge (or nothing, untiled). Cobalt scales that one
+  call to the scene size and the minimap draws in place.
+
+How it was found: `fh1_debug_log_draws` for a few frames at 720p and 540p
+showed the minimap's draws carrying a scissor of (63,502)-(256,688) in
+720p pixels. Hooking D3D's scissor path (`sub_824B1120`, the per-tile
+intersection; `sub_824B36D8`, `SetScissorRect`; `sub_824B3E00` and
+`sub_824B4068`, `SetViewport`) and logging callers found the viewport. The
+other non-zero viewports are 128x128 tiles in 512x512 targets and already
+at their own sizes. `cobalt_viewport_log` logs the viewports and callers.
+
+"PLACE" next to the position is a label that fades in and out, at both
+sizes. One 540p capture out of three showed a reddish tint over the right
+half of the frame; not seen at 720p, and the next capture was clean.
+
+With the HUD complete, blindvac (UHD 620, `cobalt_low_end`, vsync off, 30 s):
+960x540 ran 38.9 and 39.4 fps (1.93, 1.90 cores) against 32.4 fps (1.62
+cores) at 720p in between, +21 %. p95 frames stay at 33.7-33.9 ms.
+
+Diagnostics: `cobalt_scene_probe` logs the headers, and
+`cobalt_scene_keep_mask` leaves chosen ones at 720p.

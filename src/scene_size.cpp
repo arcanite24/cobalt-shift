@@ -19,6 +19,9 @@
 #include <iterator>
 #include <string>
 #include <thread>
+#include <mutex>
+#include <set>
+#include <tuple>
 #include <chrono>
 
 #include <fmt/format.h>
@@ -26,6 +29,7 @@
 #include <rex/cvar.h>
 #include <rex/logging/macros.h>
 #include <rex/ppc/context.h>
+#include <rex/ppc/func.h>
 #include <rex/runtime.h>
 #include <rex/system/interfaces/graphics.h>
 #include <rex/system/kernel_state.h>
@@ -207,4 +211,42 @@ void CobaltSceneTexturesMade(PPCRegister& r31) {
   auto* screen = memory->TranslateVirtual<uint32_t*>(r31.u32 + 472);
   screen[0] = rex::byte_swap(cobalt::g_scene_width);
   screen[1] = rex::byte_swap(cobalt::g_scene_height);
+}
+
+// D3D's SetViewport(D3DVIEWPORT9*) (sub_824B4068: r3 the device, r4 the
+// viewport: x, y, width, height, min z, max z).
+REXCVAR_DEFINE_BOOL(cobalt_viewport_log, false, "Cobalt",
+                    "Diagnostic (#23): log the game's D3D viewports and their callers")
+    .lifecycle(rex::cvar::Lifecycle::kRequiresRestart);
+
+extern "C" REX_FUNC(__imp__sub_824B4068);
+extern "C" REX_FUNC(sub_824B4068) {
+  if (REXCVAR_GET(cobalt_viewport_log)) {
+    const auto* vp = reinterpret_cast<const uint32_t*>(base + ctx.r4.u32);
+    static std::mutex mutex;
+    static std::set<std::tuple<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t>> seen;
+    std::lock_guard lock(mutex);
+    const uint32_t x = rex::byte_swap(vp[0]), y = rex::byte_swap(vp[1]), w = rex::byte_swap(vp[2]),
+                   h = rex::byte_swap(vp[3]);
+    if (seen.size() < 300 && seen.emplace(uint32_t(ctx.lr), x, y, w, h).second) {
+      REXLOG_INFO("[scene] D3D SetViewport from {:08X}: {} {} {} {}", uint32_t(ctx.lr), x, y, w, h);
+    }
+  }
+  // The minimap (called from 0x827B5EF8) sets its viewport in 720p screen
+  // pixels, {63, 502, 193, 186}, where the rest of the HUD follows the
+  // renderer's screen size: scale it to the scene.
+  if (cobalt::g_scene_width && uint32_t(ctx.lr) == 0x827B5EF8) {
+    auto* vp = reinterpret_cast<uint32_t*>(base + ctx.r4.u32);
+    uint32_t saved[4];
+    for (int i = 0; i < 4; ++i) {
+      saved[i] = vp[i];
+      const uint32_t full = (i & 1) ? 720 : 1280, scene = (i & 1) ? cobalt::g_scene_height
+                                                                    : cobalt::g_scene_width;
+      vp[i] = rex::byte_swap(uint32_t((uint64_t(rex::byte_swap(vp[i])) * scene + full / 2) / full));
+    }
+    __imp__sub_824B4068(ctx, base);
+    for (int i = 0; i < 4; ++i) vp[i] = saved[i];
+    return;
+  }
+  __imp__sub_824B4068(ctx, base);
 }
