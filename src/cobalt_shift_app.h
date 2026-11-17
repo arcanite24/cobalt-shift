@@ -53,8 +53,15 @@ class CobaltShiftApp : public rex::ReXApp {
     // The CP writes the ring read pointer back inside long bursts too, and
     // wakes the render thread blocked in FM3's ring-space wait
     // (src/ring_wait.cpp), as Lavender does for FH2.
+    //
+    // clear_memory_page_state drops every CPU-uploaded page's valid bit at
+    // each frame end, so FM3 re-uploaded all of its geometry every frame:
+    // about 17 MB and 390 uploads, each ending the open rendering. Write
+    // watches already catch the CPU's writes to uploaded pages; off, uploads
+    // fall to about 40 KB a frame (docs/BASELINE.md). Lavender sets it too.
     for (const auto& [name, value] : {std::pair{"pinyon_shift_fh1_render_fps_limit", "30"},
-                                      std::pair{"gpu_read_pointer_publish_dwords", "1024"}}) {
+                                      std::pair{"gpu_read_pointer_publish_dwords", "1024"},
+                                      std::pair{"clear_memory_page_state", "false"}}) {
       if (rex::cvar::GetFlagSource(name) == rex::cvar::Source::kDefault) {
         rex::cvar::SetFlagByName(name, value);
       }

@@ -55,22 +55,34 @@ try {
     $process.Refresh()
     $cpu0 = $process.TotalProcessorTime
     $threads0 = & (Join-Path $PSScriptRoot 'thread_cpu.ps1') -ProcessId $process.Id
+    # Other ShiftGlue games share the CPU and GPU: record their CPU so a
+    # contaminated run says so.
+    $others = @(Get-Process -Name 'lavender_shift*', 'pinyon_shift*' -ErrorAction SilentlyContinue)
+    $others0 = @{}; foreach ($o in $others) { $others0[$o.Id] = $o.TotalProcessorTime.TotalSeconds }
     $t0 = Get-Date
     if ($Throttle) { Set-Content -LiteralPath $pad -Value 'hold rt 1.0' }
     Start-Sleep -Seconds $Seconds
     $process.Refresh()
     $cores = ($process.TotalProcessorTime - $cpu0).TotalSeconds / ((Get-Date) - $t0).TotalSeconds
     $threads = & (Join-Path $PSScriptRoot 'thread_cpu.ps1') -ProcessId $process.Id -Since $threads0
+    $elapsed = ((Get-Date) - $t0).TotalSeconds
+    $otherCpu = @(foreach ($o in $others) {
+        try { $o.Refresh(); '{0} {1}: {2:N2} cores' -f $o.Name, $o.Id, (($o.TotalProcessorTime.TotalSeconds - $others0[$o.Id]) / $elapsed) }
+        catch { '{0} {1}: exited' -f $o.Name, $o.Id }
+    })
     $last = @(Get-Content -LiteralPath $csv).Count - 1
     & (Join-Path $PSScriptRoot 'window_shot.ps1') -ProcessId $process.Id -Path (Join-Path $logs "bench-$Name.png")
     $frames = $last - $first
     $summary = @("bench $Name  exe: $Executable  args: $($GameArguments -join ' ')$(if ($Throttle) { '  (throttle)' })",
         ('process cores busy: {0:N2}  frames in window: {1}  ({2:N1}/s)  CPU per frame: {3:N2} ms' -f
             $cores, $frames, ($frames / $Seconds), ($cores * $Seconds * 1000 / [Math]::Max(1, $frames))),
+        "other ShiftGlue games during the window: $(if ($otherCpu) { $otherCpu -join ', ' } else { 'none' })",
         '', 'threads:') + $threads + @('') +
         @(& $python -I (Join-Path $PSScriptRoot 'perf_summary.py') $csv $first $last)
     $summary | Set-Content -LiteralPath (Join-Path $logs "bench-$Name.txt")
     $summary
 } finally {
     Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
+    # Back-to-back runs: launch.ps1 refuses to start while one is still exiting.
+    Wait-Process -Id $process.Id -Timeout 30 -ErrorAction SilentlyContinue
 }

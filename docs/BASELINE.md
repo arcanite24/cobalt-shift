@@ -112,6 +112,64 @@ wall-clock samples:
 "GPU Submission" is 98 % inside the NVIDIA driver and `ntdll`. No single
 hotspot: the cost is the per-draw Xenos emulation, spread across the path.
 
+## The GPU side: uploads ended the render passes
+
+Uncapped (`--pinyon_shift_fh1_render_fps_limit=180 --host_present_fps_limit=0
+--vsync=false`) the grid ran at 78-87 fps and was GPU-bound. The executor's
+GPU profile (`--fh1_native_gpu_profile=true --fh1_native_gpu_profile_draws=true`)
+showed 441 renderings a frame, 352 of them ended by
+`VulkanSharedMemory::UploadRanges`: every guest-memory upload is a
+`vkCmdCopyBuffer`, which can't run inside a rendering. The uploads took about
+3.5-5.3 ms of GPU time over about 600 copies, and the main target was begun
+245-339 times a frame for 3-4 ms. FM3 doesn't use MSAA on the host here:
+`fh1_msaa_single_sample` is already on, and the "2x" in the target key is the
+guest's sample count.
+
+The volume was the surprise: about 17 MB a frame, 390 uploads, almost all
+vertex data. The write-watch census (`--write_watch_fault_trace=600`) counted
+only about 3 faults a frame and no announced writes, so the CPU wasn't
+rewriting it. `clear_memory_page_state` (SDK default on) drops the valid bit
+of every page the CPU uploaded at each frame end, so all of FM3's geometry
+went up again every frame. Write watches already catch real CPU writes to
+uploaded pages. Lavender Shift turns it off too, and now Cobalt does.
+
+| Run | Change | frames/s | cores | CPU ms/frame | GPU ms p50 | uploads/frame |
+|---|---|---|---|---|---|---|
+| h-unc-off | uncapped, page state cleared (old default) | 86.7 | 3.10 | 35.8 | 11.0 | 17.3 MB, 392 splits |
+| k-unc | uncapped, `clear_memory_page_state=false` | 92.0 | 2.78 | 30.2 | 7.6 | 42 KB, 7 splits |
+| g-cb1ring | 60 cap, page state cleared | 58.5 | 1.76 | 30.2 | | |
+| k-cap | 60 cap, `clear_memory_page_state=false` | 59.8 | **1.62** | **27.1** | 14.8 (clocked down) | 38 KB, 8 splits |
+
+With nothing else running (m-cap, the new defaults): **60.0 fps, p99
+17.2 ms, 1.48 cores, 24.0 ms CPU a frame**, against 41.8 ms for the first build
+on the same grid. That's 41 % less CPU per frame, and no frame missed a vblank.
+Uncapped (m-unc, with Lavender back for part of it): 105.9 fps, 2.94 cores, GPU
+frame p50 7.5 ms. A full-throttle run with the new defaults renders the moving
+car and scenery correctly (k-throttle: 1.38 cores, 22.4 ms a frame).
+
+The k-* rows: Lavender Shift was running alongside every one of these (4.6 cores and a
+third of the GPU when checked), so the frame rates are noisy. Upload volume
+and splits are not.
+
+### Shared memory the CPU writes (`vulkan_shared_memory_host_direct`)
+
+Before finding the page-state reset, the SDK (`cobalt` branch) gained an
+opt-in path: shared memory in device-local, host-visible memory (resizable BAR
+here; any memory on an integrated GPU), with uploads `memcpy`'d into it by the
+GPU commands thread instead of copied on the GPU. No copy, barrier or
+rendering break. With the old 17 MB a frame it removed every upload-ended
+rendering (352 -> 0; the main target was begun 6 times a frame instead of 245)
+and GPU frame time fell from 15.3 to 11.9 ms under the profiler. Without the
+profiler it lost overall, because the GPU commands thread then pushed all
+17 MB over PCIe itself: about 2.8 ms more CPU a frame. With 40 KB a frame it
+measures the same as the copy path (k-unc-direct 92.7 fps, k-cap-direct
+26.8 ms), so it stays off. It is worth trying again on the UHD 620, where
+the memory is shared and a GPU copy is pure overhead. It gives up snapshot
+semantics: a draw already recorded in the same submission sees the new data.
+
+The executor's profile now also logs uploads by kind (vertex, index, texture,
+with bytes repeated within a frame), as the D3D12 executor did.
+
 ## The generated code was being compiled at -O0
 
 The rebuild for CB-1 came out three times larger (`.text` 36 -> 103 MB). On
