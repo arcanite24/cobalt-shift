@@ -413,15 +413,29 @@ dialogs), and stale background showed through. With
 `fh1_untile_predicated_tiling=false` they were whole. The race and the
 menus both tile in 256/256/208-row bands, but the race tiles a 2X MSAA
 surface (`RB_SURFACE_INFO` 0x14010500) and the menus and the garage's car
-tile at 4X (0x14020500). Drawing the later tiles as well
-(`fh1_debug_untile=2`) didn't fix the menus, so it is in the untiled
-surface's resolves, not in the skipped draws.
+tile at 4X (0x14020500).
 
-The SDK's `fh1_untile_msaa_mask` (bit per guest MSAA mode) now picks which
-tilings are untiled; others keep their tiles. Cobalt sets it to 2 (2X
-only). My Cars is whole again. The race still skips about 740 later-tile
-draws a frame: 278 fps uncapped on the grid on multivac, the same image,
-and the whole HUD at 960x540.
+For a while the SDK's `fh1_untile_msaa_mask` (bit per guest MSAA mode)
+kept the 4X tilings tiled, with Cobalt setting it to 2. The cause turned
+up in a draw log of Quick Upgrade. Between its UI layers each tile has a
+depth-only draw (EDRAM mode 5) predicated on that tile's bins alone, at
+window offset 0, in the tile's own EDRAM rows. Untiled, the first tile
+left the later tiles' copies to their passes, where they hit the first
+tile's rows. Below row 256 depth was never reset, and later layers failed
+the depth test there. Disabling the shared 4X depth alias didn't help.
+
+The SDK now records each later tile's screen rows from its pass's window
+offset. The first tile runs a draw predicated on one later tile in that
+tile's rows, and that tile's pass drops it. With all MSAA modes untiled
+again (the SDK's default mask, 7), My Cars and the main menu match the
+tiled image.
+
+The race doesn't change. At 720p it untiles only its 2X scene, and its
+4X targets (mirror and reflection sizes) aren't tiled. Uncapped on the
+grid, mask 7 measured 178 and 179 fps and mask 2 189 and 192. Aligned on
+race start, though, 30-second segments vary by ±15 % in both and neither
+leads. Ladera at 960x540 (low-end) tiles 2X too, and skips about 1,500
+draws a frame either way with the whole HUD.
 
 `src/render_rates.cpp` ports four of FM3-ReGPU's cuts, all hot-reloadable
 and off by default:

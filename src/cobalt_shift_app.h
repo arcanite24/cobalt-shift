@@ -75,16 +75,14 @@ class CobaltShiftApp : public rex::ReXApp {
     // only) draws FM3's predicated-tiling race scene once instead of once a
     // tile: 1,975 -> 1,502 draws a frame on the grid, about 7 % less CPU a
     // frame uncapped on the 5800X (250 -> 256-265 fps), the same image, and
-    // the whole HUD at 960x540. The race tiles a 2X MSAA surface; the menus
-    // and garage tile at 4X and were cut below their first tile untiled, so
-    // fh1_untile_msaa_mask keeps their tiles (docs/BASELINE.md).
+    // the whole HUD at 960x540. The menus and garage tile at 4X and draw a
+    // depth-only reset per tile; the SDK runs those in their tiles' rows.
     for (const auto& [name, value] : {std::pair{"pinyon_shift_fh1_render_fps_limit", "30"},
                                       std::pair{"gpu_read_pointer_publish_dwords", "1024"},
                                       std::pair{"clear_memory_page_state", "false"},
                                       std::pair{"spirv_implicit_lod_2d", "true"},
                                       std::pair{"spirv_fast_pixel_math", "true"},
-                                      std::pair{"fh1_untile_predicated_tiling", "true"},
-                                      std::pair{"fh1_untile_msaa_mask", "2"}}) {
+                                      std::pair{"fh1_untile_predicated_tiling", "true"}}) {
       if (rex::cvar::GetFlagSource(name) == rex::cvar::Source::kDefault) {
         rex::cvar::SetFlagByName(name, value);
       }
