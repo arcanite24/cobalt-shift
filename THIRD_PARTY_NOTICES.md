@@ -2,8 +2,9 @@
 
 Cobalt Shift ports a few guest hooks from FM3-ReGPU
 (https://github.com/braaap-stututu/FM3-ReGPU): `src/ring_wait.cpp` (the
-ring-space poll) and `src/render_rates.cpp` (car shadow, reflection and
-mirror rates, distant car detail). Their notes and addresses come from its
+ring-space poll), `src/render_rates.cpp` (car shadow, reflection and
+mirror rates, distant car detail) and `src/ai_player.cpp` (the race AI
+driving the player's car). Their notes and addresses come from its
 `src/hooks`; the code here is our own on ShiftGlue. Its licence:
 
 ```
