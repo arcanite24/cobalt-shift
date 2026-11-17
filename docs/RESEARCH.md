@@ -107,6 +107,47 @@ Record fps, p99, CPU cores and GPU ms. Route A can be measured only
 after stage 0. Until then, FH1 on Glue2GPU against FH1 on ShiftGlue is
 a proxy, since Glue2GPU already runs FH1.
 
+### Decision (CB-0.3, measured 2026-11-17): Route A
+
+FM3-ReGPU was built from source (`a6e1c43`, its own patch stack, AMD
+FidelityFX SDK 2.1.0 and BtbN FFmpeg n8.1 LGPL in its gitignored
+`thirdparty`) and run on our own `default.xex`. `tools/bench_regpu.ps1`
+takes it through FM3's first-run flow with ReGPU's debug-server pad, on the
+same route, timing and window as `tools/bench_race.ps1`: the opening grid at
+Montserrat, the player's car parked while the field drives off. ReGPU's
+numbers come from its own per-second "perf lite" log.
+
+multivac (5800X + RTX 4080), same session, 30 s windows:
+
+| | Cobalt (ShiftGlue, Vulkan) | FM3-ReGPU (D3D12, 2x MSAA) |
+|---|---|---|
+| 720p uncapped | 214 fps, p99 8.8 ms, 4.1 cores | 194 fps (1x: 184), p99 7.7 ms, 4.0 cores |
+| 1440p uncapped | 218 fps, p99 7.7 ms | 182 fps, p99 8.0 ms |
+| 4K uncapped | 188 fps, p99 9.5 ms (3x, single-sampled) | 196 fps, p99 7.8 ms |
+| 720p at the 60 fps cap | 1.27 cores, p99 17.3 ms, max 17.7 ms | 1.84 cores, p99 18.3 ms, max 58 ms |
+
+Both are CPU-bound on this machine (ReGPU's draw thread 98 % busy, GPU
+1–2 ms a frame), so they come out within run-to-run noise of each other
+uncapped. At the cap, ReGPU costs 45 % more CPU and has worse hitches.
+
+blindvac (Intel UHD 620, 4 cores / 8 threads), ReGPU on `REGPU_ADAPTER=UHD`
+(Windows' default adapter there is the disabled 930MX):
+
+| | Cobalt | FM3-ReGPU |
+|---|---|---|
+| Full quality, 2x MSAA | 17.9 fps | 6–7 presents a second, still compiling after 6 minutes; one run hung the GPU (`887A0006`) at the title screen |
+| Low-end | 31.4 fps grid, 37.3 moving (`cobalt_low_end`, 1.0–1.7 cores) | 27.5 fps average, lowest second 15.9, 400–500 ms compile hitches, 5.1 cores ("potato": 1x MSAA, one guest tile, half-rate shadows, mirror and reflections, far AI cars at LOD 3) |
+
+ReGPU's speed on strong desktops (its README: 300–360 fps on a 9800X3D +
+7900 XTX) doesn't carry over to the low end, which is this project's first
+priority: on the UHD 620 it is slower even with more cut, needs three times
+the CPU, and is D3D12-only. Route A stays. ReGPU remains the reference for
+ideas, now with a working build to compare against:
+- its draw cuts are guest hooks that port to Cobalt (one guest tile,
+  `FM3_SHADOW_RATE`, `FM3_MIRROR_RATE`, `FM3_REFLECT_RATE`,
+  `FM3_CAR_LOD_FAR`; +22 % on their iGPU), next for the low-end preset;
+- its frozen grid and debug-server pad are the model for our own A/B tools.
+
 A hybrid is possible: Route A everywhere, plus Glue2GPU as an optional
 plugin for high-end Windows. Most items below work on both routes,
 because they are ideas for a GPU front end rather than ReGPU code.
