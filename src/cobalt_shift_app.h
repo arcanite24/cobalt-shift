@@ -10,6 +10,7 @@
 #include <rex/runtime.h>
 #include <rex/system/gpu_plugin.h>
 
+#include <string>
 #include <utility>
 
 REXCVAR_DECLARE(std::string, gpu_backend);
@@ -92,6 +93,23 @@ class CobaltShiftApp : public rex::ReXApp {
         if (rex::cvar::GetFlagSource(name) == rex::cvar::Source::kDefault) {
           rex::cvar::SetFlagByName(name, value);
         }
+      }
+    }
+    // Above the default cap, split the GPU commands thread in two: decoding
+    // on one, register writes and draw recording on the other. Uncapped on
+    // the 5800X it took the grid from about 215 to 282 fps. At the 60 fps
+    // cap it only adds CPU (1.04 -> 1.21 cores), and the UHD 620 laptop gains
+    // little for 0.25 more cores, so the default and low-end setups keep one
+    // thread. A limit of 0 follows the display, so it isn't counted as raised.
+    if (rex::cvar::GetFlagSource("gpu_record_thread") == rex::cvar::Source::kDefault &&
+        !REXCVAR_GET(cobalt_low_end)) {
+      int render_limit = 0;
+      try {
+        render_limit = std::stoi(rex::cvar::GetFlagByName("pinyon_shift_fh1_render_fps_limit"));
+      } catch (...) {
+      }
+      if (render_limit > 30) {
+        rex::cvar::SetFlagByName("gpu_record_thread", "true");
       }
     }
   }

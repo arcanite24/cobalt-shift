@@ -356,3 +356,26 @@ For #3: FM3-ReGPU reports 300-360 fps in races on a 9800X3D + 7900 XTX at
 1440p 4x MSAA. This is 215 fps on a 5800X + RTX 4080 at 720p. That's not the
 same machine or scene, so it doesn't decide anything. The like-for-like run
 needs FM3-ReGPU built here.
+
+### Split command thread (`gpu_record_thread`)
+
+The submission settings changed nothing (`vulkan_submit_on_primary_buffer_end=false`:
+214.5 fps; plus `vulkan_async_submission_split_draws=0`: 222.8). Splitting
+the GPU commands thread did: one thread decodes the guest's command stream,
+a second applies register writes and records draws (Pinyon's LP-1.1).
+
+| Run | fps | p99 frame | cores busy | CPU per frame |
+|---|---|---|---|---|
+| uncapped, one thread | ~215 | 7.4 ms | 2.9 | 13.4 ms |
+| uncapped, `gpu_record_thread=true` | 282.0 | 5.6 ms | 4.06 | 14.4 ms |
+| uncapped, automatic (below) | **292.7** | 5.3 ms | 4.05 | 13.8 ms |
+| 60 fps cap, one thread | 60.0 | 17.1 ms | 1.04 | 17.1 ms |
+| 60 fps cap, `gpu_record_thread=true` | 60.0 | 17.1 ms | 1.21 | 20.1 ms |
+| blindvac low-end, one thread | 31.4 | | 1.44 | |
+| blindvac low-end, `gpu_record_thread=true` | 33.1 | 34.5 ms | 1.69 | 51.1 ms |
+
+The image is unchanged (`bench-unc-rec.png`). Cobalt now turns it on by
+itself when `pinyon_shift_fh1_render_fps_limit` is above 30 (the frame cap
+raised) and `cobalt_low_end` is off. At the default cap it would only cost
+CPU, so it stays off there; the command line or config file still decides
+when set.
