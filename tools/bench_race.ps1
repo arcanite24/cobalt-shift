@@ -14,7 +14,16 @@ param(
     [int]$Settle = 15,
     # Drive at full throttle instead of sitting on the grid (not repeatable:
     # the camera and draw counts vary run to run).
-    [switch]$Throttle
+    [switch]$Throttle,
+    # first-run: the opening race at Montserrat, the car parked on the grid.
+    # season: a profile past the first run (-Seed, restored every run) goes
+    # Go Race > Season Play into its next event, and the race AI drives the
+    # player's car (cobalt_ai_player). The seed is a user data folder holding
+    # a profile folder; .local/seeds/after-first-race is at FWD Open race 2,
+    # Ladera Test Track Short Circuit Reverse.
+    [ValidateSet('first-run', 'season')]
+    [string]$Route = 'first-run',
+    [string]$Seed = ''
 )
 
 # Repeatable baseline: boots FM3, walks the first-run flow into the opening
@@ -31,13 +40,37 @@ $root = Split-Path -Parent $PSScriptRoot
 $logs = New-Item -ItemType Directory -Force -Path (Join-Path $root '.local/logs')
 $csv = Join-Path $logs "bench-$Name.csv"
 Remove-Item -LiteralPath $csv -ErrorAction SilentlyContinue
-$pad = Join-Path $root '.local/user/pad.txt'
 $python = Join-Path $root '.local/toolchain/python-3.13.15/python.exe'
+$userRoot = Join-Path $root '.local/user'
+$routeArguments = @()
+if ($Route -eq 'season') {
+    if (-not $Seed) { $Seed = Join-Path $root '.local/seeds/after-first-race' }
+    if (-not (Test-Path -LiteralPath $Seed)) { throw "No seed profile: $Seed" }
+    $userRoot = Join-Path $root '.local/user-season'
+    Remove-Item -LiteralPath $userRoot -Recurse -Force -ErrorAction SilentlyContinue
+    Copy-Item -LiteralPath $Seed -Destination $userRoot -Recurse
+    $routeArguments = @('--cobalt_ai_player=true')
+    if (-not $PSBoundParameters.ContainsKey('RaceWait')) { $RaceWait = 240 }
+}
+$pad = Join-Path $userRoot 'pad.txt'
 
-$process = & (Join-Path $PSScriptRoot 'launch.ps1') -Executable $Executable -GameArguments (@(
-    "--perf_log_csv=$csv", "--log_file=$(Join-Path $logs "bench-$Name.log")") + $GameArguments)
+$process = & (Join-Path $PSScriptRoot 'launch.ps1') -Executable $Executable -UserRoot $userRoot -GameArguments (@(
+    "--perf_log_csv=$csv", "--log_file=$(Join-Path $logs "bench-$Name.log")") + $routeArguments + $GameArguments)
 $started = Get-Date
 try {
+    if ($Route -eq 'season') {
+        # The menus hide after a few idle seconds and the next press only
+        # shows them again, so a press that may meet a hidden menu is doubled.
+        Start-Sleep -Seconds 60
+        Set-Content -LiteralPath $pad -Value (@(
+            'A 200', 'wait 25000') +                         # intro movie
+            @(1..8 | ForEach-Object { 'A 200'; 'wait 9000' }) + @(  # logo, attract, title
+            'START 200', 'wait 5000', 'A 200', 'wait 6000',  # the car showcase > MAIN MENU
+            'A 100', 'wait 3000',                            # GO RACE
+            'A 100', 'wait 800', 'A 100', 'wait 8000',       # SEASON PLAY, the calendar's event
+            'A 100', 'wait 15000',                           # START RACE: loads PRE-RACE
+            'A 100', 'wait 1500', 'A 100') -join "`n")       # PRE-RACE: START RACE
+    } else {
     Start-Sleep -Seconds 40
     Set-Content -LiteralPath $pad -Value (@(
         'A 200', 'wait 1500', 'A 200', 'wait 1500', 'START 200', 'wait 3000', 'START 200',
@@ -48,6 +81,7 @@ try {
         # (Casual), the showcase, the flyover and the race intro, whatever
         # their timing. Casual shifts automatically, so A does nothing on the grid.
         @(1..40 | ForEach-Object { 'A 200'; 'wait 2300' }) -join "`n")
+    }
     if ($Throttle) { $Settle = 0 }
     $remaining = $RaceWait + $Settle - ((Get-Date) - $started).TotalSeconds
     if ($remaining -gt 0) { Start-Sleep -Seconds $remaining }
@@ -73,7 +107,7 @@ try {
     $last = @(Get-Content -LiteralPath $csv).Count - 1
     & (Join-Path $PSScriptRoot 'window_shot.ps1') -ProcessId $process.Id -Path (Join-Path $logs "bench-$Name.png")
     $frames = $last - $first
-    $summary = @("bench $Name  exe: $Executable  args: $($GameArguments -join ' ')$(if ($Throttle) { '  (throttle)' })",
+    $summary = @("bench $Name  route: $Route  exe: $Executable  args: $($GameArguments -join ' ')$(if ($Throttle) { '  (throttle)' })",
         ('process cores busy: {0:N2}  frames in window: {1}  ({2:N1}/s)  CPU per frame: {3:N2} ms' -f
             $cores, $frames, ($frames / $Seconds), ($cores * $Seconds * 1000 / [Math]::Max(1, $frames))),
         "other ShiftGlue games during the window: $(if ($otherCpu) { $otherCpu -join ', ' } else { 'none' })",

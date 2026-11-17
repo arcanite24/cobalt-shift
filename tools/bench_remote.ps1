@@ -14,7 +14,11 @@ param(
     [int]$ShotEvery = 0,
     # Hold the throttle once the race has started, so the window measures the
     # car moving instead of standing on the grid.
-    [switch]$Drive
+    [switch]$Drive,
+    # As bench_race.ps1: first-run, or season (C:\cobalt\seeds\after-first-race
+    # restored into C:\cobalt\user-season, the race AI driving).
+    [ValidateSet('first-run', 'season')]
+    [string]$Route = 'first-run'
 )
 
 # bench_race.ps1 for another machine on the LAN (the low-end target is
@@ -50,9 +54,20 @@ function Save-Shot([string]$Path) {
 # and picks it by default (the game hung there); the UHD 620 is device 0.
 $arguments = @('--perf_log_csv=C:\cobalt\logs\bench.csv', '--log_file=C:\cobalt\logs\bench.log',
     '--vulkan_device=0') + $GameArguments
+# The user data folder C:\cobalt\launch.ps1 (tools/remote/launch.ps1) uses.
+$user = 'C:\cobalt\user'
+$userSetup = 'Remove-Item C:\cobalt\user_root.txt -ErrorAction SilentlyContinue'
+if ($Route -eq 'season') {
+    $user = 'C:\cobalt\user-season'
+    $arguments += '--cobalt_ai_player=true'
+    if (-not $PSBoundParameters.ContainsKey('RaceWait')) { $RaceWait = 240 }
+    $userSetup = "Remove-Item -Recurse -Force $user -ErrorAction SilentlyContinue; " +
+        "Copy-Item -Recurse C:\cobalt\seeds\after-first-race $user; Set-Content C:\cobalt\user_root.txt $user"
+}
 Invoke-Remote @"
 if (Get-Process cobalt_shift -ErrorAction SilentlyContinue) { throw 'cobalt_shift is already running' }
-Remove-Item C:\cobalt\logs\bench.csv, C:\cobalt\logs\bench.log, C:\cobalt\user\pad.txt -ErrorAction SilentlyContinue
+Remove-Item C:\cobalt\logs\bench.csv, C:\cobalt\logs\bench.log, $user\pad.txt -ErrorAction SilentlyContinue
+$userSetup
 Set-Content -LiteralPath C:\cobalt\args.txt -Value @('$($arguments -join "','")')
 "@ | Out-Null
 $holder = $null
@@ -69,12 +84,20 @@ try {
     $pad = @('A 200', 'wait 1500', 'A 200', 'wait 1500', 'START 200', 'wait 3000', 'START 200',
         'wait 20000', 'A 200', 'wait 15000', 'DOWN 200', 'wait 500', 'A 200', 'wait 15000') +
         @(1..40 | ForEach-Object { 'A 200'; 'wait 2300' })   # as bench_race.ps1
+    $padAt = 40
+    if ($Route -eq 'season') {
+        $pad = @('A 200', 'wait 25000') + @(1..8 | ForEach-Object { 'A 200'; 'wait 9000' }) +
+            @('START 200', 'wait 5000', 'A 200', 'wait 6000', 'A 100', 'wait 3000',
+              'A 100', 'wait 800', 'A 100', 'wait 8000', 'A 100', 'wait 15000',
+              'A 100', 'wait 1500', 'A 100')               # as bench_race.ps1 -Route season
+        $padAt = 60
+    }
     if ($Drive) { $pad += @('hold rt 1.0') }
     $nextShot = if ($Interactive -and $ShotEvery) { $ShotEvery } else { [int]::MaxValue }
     while (((Get-Date) - $started).TotalSeconds -lt $RaceWait + $Settle) {
         $elapsed = ((Get-Date) - $started).TotalSeconds
-        if ($elapsed -ge 40 -and $pad) {
-            Invoke-Remote "Set-Content -LiteralPath C:\cobalt\user\pad.txt -Value @('$($pad -join "','")')" | Out-Null
+        if ($elapsed -ge $padAt -and $pad) {
+            Invoke-Remote "Set-Content -LiteralPath $user\pad.txt -Value @('$($pad -join "','")')" | Out-Null
             $pad = $null
         }
         if ($elapsed -ge $nextShot) {
@@ -107,7 +130,7 @@ Start-Sleep -Seconds $Seconds
 & scp -q -o BatchMode=yes "${HostName}:C:/cobalt/logs/bench.csv" "$stem.csv" 2>$null
 & scp -q -o BatchMode=yes "${HostName}:C:/cobalt/logs/bench.log" "$stem.log" 2>$null
 $frames = $last - $first
-$summary = @("remote bench $Name on ${HostName}  args: $($GameArguments -join ' ')",
+$summary = @("remote bench $Name on ${HostName}  route: $Route  args: $($GameArguments -join ' ')",
     ('process cores busy: {0:N2}  frames in window: {1}  ({2:N1}/s)  CPU per frame: {3:N2} ms' -f
         $cores, $frames, ($frames / $Seconds), ($cores * $Seconds * 1000 / [Math]::Max(1, $frames))), '') +
     @(& $python -I (Join-Path $PSScriptRoot 'perf_summary.py') "$stem.csv" $first $last)

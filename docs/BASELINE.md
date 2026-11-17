@@ -507,3 +507,37 @@ config file still wins; `--cobalt_scene_size=` keeps 720p). Plain
 
 Diagnostics: `cobalt_scene_probe` logs the headers, and
 `cobalt_scene_keep_mask` leaves chosen ones at 720p.
+
+## Another track: Season Play at Ladera (#24, 2026-11-17)
+
+FM3 repeats its first-run flow until the opening race is finished, which a
+scripted pad can't drive. `cobalt_ai_player` (`src/ai_player.cpp`, from
+FM3-ReGPU) lets the race AI drive the player's car, so
+`tools/make_seed.ps1` plays the first run and the next races with the pad
+pressing A through the menus, and saves the profile as a seed
+(`.local/seeds/after-first-race`, not in the repo). After about 20 minutes
+it had finished the opening race, picked the Ford Fiesta Zetec S and won
+FWD Open race 1 at the Iberian Short Circuit.
+
+`tools/bench_race.ps1 -Route season` (and `tools/bench_remote.ps1 -Route
+season`, seed in `C:\cobalt\seeds`) restores the seed each run, walks
+title > MAIN MENU > GO RACE > SEASON PLAY into the next event, FWD Open race
+2 at Ladera Test Track, Short Circuit Reverse, and measures 60 s from about
+255 s in, with the AI racing the Fiesta among seven cars. Two things about
+the menus: they hide after a few idle seconds, and the next press only
+shows them again, so the route doubles the presses that may meet a hidden
+menu; and A is the title screen's button, not START.
+
+| Machine, settings | fps | frame p95 | cores | draws/frame |
+|---|---|---|---|---|
+| multivac, defaults (60 cap) | 60.0 | 17.1 ms | 1.20 | 2,285 |
+| multivac, uncapped | 268.7 | | 3.97 (14.8 ms CPU/frame) | |
+| blindvac, `cobalt_low_end`, vsync off | 29.8 | 34.0 ms | 0.98 | 1,419 |
+
+blindvac is GPU-bound at Ladera: 33.3 ms of GPU a frame, so frames land on
+every other 60 Hz vblank, where the parked Montserrat grid ran 39-40 fps.
+
+Ladera's road shows blocky low-resolution texture over the asphalt and
+run-off, the same with Cobalt's defaults and with untiling,
+`spirv_implicit_lod_2d` and `spirv_fast_pixel_math` all off
+(`bench-ladA.png`, `bench-ladP.png`).
