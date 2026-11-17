@@ -315,3 +315,15 @@ in N of the matching draws. With the low-end preset:
 
 Only skipping them all holds 30 fps, so the preset keeps that. Keeping 1 in 3
 is the option for a better image on the same GPU.
+
+Car moving (`bench_remote.ps1 -Drive`: the throttle held from the race
+start, no steering, so the car ends up somewhere along the first straight or
+at the first turn; no image, the capture swap was never reached):
+
+| Run | fps | p99 frame |
+|---|---|---|
+| defaults | 28.1 | 50.1 ms |
+| `--cobalt_low_end=true` | 37.3 | 34.1 ms |
+
+Away from the grid the scene is lighter, and the preset stays above 30 fps.
+Other tracks are not measured yet.

@@ -11,7 +11,10 @@ param(
     # over SSH, and take screenshots (CobaltShot task).
     [switch]$Interactive,
     # With -Interactive: screenshots every this many seconds from launch.
-    [int]$ShotEvery = 0
+    [int]$ShotEvery = 0,
+    # Hold the throttle once the race has started, so the window measures the
+    # car moving instead of standing on the grid.
+    [switch]$Drive
 )
 
 # bench_race.ps1 for another machine on the LAN (the low-end target is
@@ -66,6 +69,7 @@ try {
     $pad = @('A 200', 'wait 1500', 'A 200', 'wait 1500', 'START 200', 'wait 3000', 'START 200',
         'wait 20000', 'A 200', 'wait 15000', 'DOWN 200', 'wait 500', 'A 200', 'wait 15000') +
         @(1..40 | ForEach-Object { 'A 200'; 'wait 2300' })   # as bench_race.ps1
+    if ($Drive) { $pad += @('hold rt 1.0') }
     $nextShot = if ($Interactive -and $ShotEvery) { $ShotEvery } else { [int]::MaxValue }
     while (((Get-Date) - $started).TotalSeconds -lt $RaceWait + $Settle) {
         $elapsed = ((Get-Date) - $started).TotalSeconds
