@@ -191,3 +191,48 @@ pattern: 43 % stack instructions and no `-O` on its generated units.
   HUD's lap times are clipped at the right edge. The 3D scene is fine.
 - The car shadow, road and Montserrat scenery look right. Q18 and Q19 are not
   visible on this route.
+
+## Low-end: blindvac (Intel UHD 620)
+
+blindvac is an ASUS X510UR: Core i5-8250U, Intel UHD 620 (driver
+31.0.101.2140), Windows 11. `tools/bench_remote.ps1` runs the same grid
+route there over SSH. The game runs in session 0: Vulkan renders and the
+frame loop runs, but nothing is displayed. The build goes to `C:\cobalt\bin`
+with an app-local VC++ runtime, and the disc to `C:\cobalt\game\disc`. Vulkan
+lists the disabled NVIDIA 930MX first and the game hung on it, so the bench
+passes `--vulkan_device=0`.
+
+| Run | Change | frames/s | cores | GPU ms/frame | notes |
+|---|---|---|---|---|---|
+| s0 | Cobalt defaults | 14.7 | 1.04 | 67.7 | GPU-bound |
+| s0-prof | + GPU profile | 11.2 | 1.07 | 88.9 (profiled) | main target 70 ms; one pixel shader 29 ms |
+| s0-lodmath | `spirv_implicit_lod_2d` + `spirv_fast_pixel_math` | 13.1 | 1.14 | 76.5 (profiled) | -14 % |
+| s0-flatps | + `vulkan_debug_flat_pixel_shaders` (wrong image) | 38.5 | 1.84 | 25.0 (profiled) | pixel shading is ~2/3 of the frame |
+
+Pixel shading is the bottleneck, and one shader stands out: pixel shader
+`8FEC358DC5728647` (4 texture fetches, about 20 ALU instructions) takes
+25-29 ms over 21 draws on the UHD 620, against 0.17 ms on the RTX 4080. With
+flat pixel shaders it costs 1.1 ms. Its draws run with alpha test or
+alpha-to-coverage on (modification `...000F`, depth mode `kNoModifiers`), so
+the translated shader carries `OpKill`s and has no early fragment tests.
+Every covered pixel is shaded, whatever is in front.
+
+Skipping that shader's draws (`fh1_skip_pixel_shaders`, new in the SDK's
+`cobalt` branch) changes the frame only a little on the RTX 4080: some white
+flowers in the grass and some shading on the rocks go. It is a detail layer.
+
+| Run (no profiler) | Change | frames/s | cores | GPU ms p50 |
+|---|---|---|---|---|
+| s0 | Cobalt defaults then | 14.7 | 1.04 | 67.6 |
+| p-lm | + `spirv_implicit_lod_2d` + `spirv_fast_pixel_math` | 17.9 | 1.17 | 56.0 |
+| p-lm-skip | + `fh1_skip_pixel_shaders=8FEC358DC5728647` | **30.5** | 1.59 | 32.8 |
+| p-lm-skip-bias | + `texture_mip_lod_bias=1` | 30.7 | 1.57 | 32.7 |
+
+A positive mip bias gains nothing, and on the RTX 4080 it turns the road pink
+and noisy: the road's texture has lower mips that aren't plain downscales.
+Implicit LOD and fast pixel math look the same as before on the RTX 4080, so
+Cobalt now turns both on by default. The skip is the first part of
+`--cobalt_low_end=true`, a preset for integrated GPUs (issue #22). At 30.5 fps
+the UHD 620 is still GPU-bound (32.8 ms), just past two 60 Hz vblanks. The
+rest of the pixel work is spread over many shaders: with flat pixel shaders
+the frame is 25 ms.

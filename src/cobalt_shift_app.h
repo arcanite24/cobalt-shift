@@ -14,6 +14,12 @@
 
 REXCVAR_DECLARE(std::string, gpu_backend);
 
+// Included by main.cpp only, so the definition lives here.
+REXCVAR_DEFINE_BOOL(cobalt_low_end, false, "Cobalt",
+                    "Low-end preset for integrated GPUs: drop rendering work that changes the "
+                    "image a little, for frame rate (docs/BASELINE.md, \"Low-end\")")
+    .lifecycle(rex::cvar::Lifecycle::kRequiresRestart);
+
 #include "pad_script.h"
 #include "utility_drive.h"
 
@@ -42,6 +48,9 @@ class CobaltShiftApp : public rex::ReXApp {
     // Cobalt's defaults where the SDK's differ; a value from the config file
     // or the command line wins.
     //
+    // spirv_implicit_lod_2d and spirv_fast_pixel_math: the UHD 620's grid went
+    // from 14.7 to 17.9 fps with both, and the RTX 4080's image looks the same.
+    //
     // FM3 runs its main loop once per guest vblank and takes its time step
     // from the millisecond clock (FM3-QUIRKS Q24), but the SDK fires vblanks
     // at twice the render limit for FH1, which waits for two. At 120 Hz FM3
@@ -61,9 +70,25 @@ class CobaltShiftApp : public rex::ReXApp {
     // fall to about 40 KB a frame (docs/BASELINE.md). Lavender sets it too.
     for (const auto& [name, value] : {std::pair{"pinyon_shift_fh1_render_fps_limit", "30"},
                                       std::pair{"gpu_read_pointer_publish_dwords", "1024"},
-                                      std::pair{"clear_memory_page_state", "false"}}) {
+                                      std::pair{"clear_memory_page_state", "false"},
+                                      std::pair{"spirv_implicit_lod_2d", "true"},
+                                      std::pair{"spirv_fast_pixel_math", "true"}}) {
       if (rex::cvar::GetFlagSource(name) == rex::cvar::Source::kDefault) {
         rex::cvar::SetFlagByName(name, value);
+      }
+    }
+    // The low-end preset (cobalt_low_end). Pixel shader 8FEC358DC5728647 is
+    // a terrain detail layer (grass flowers, rock shading) drawn alpha-tested,
+    // so the UHD 620 shades every covered pixel with no early depth test: a
+    // third of its frame for a barely visible layer. Skipping it took the
+    // grid from 17.9 to 30.5 fps there. A positive mip LOD bias gained
+    // nothing and turns the road pink.
+    if (REXCVAR_GET(cobalt_low_end)) {
+      for (const auto& [name, value] :
+           {std::pair{"fh1_skip_pixel_shaders", "8FEC358DC5728647"}}) {
+        if (rex::cvar::GetFlagSource(name) == rex::cvar::Source::kDefault) {
+          rex::cvar::SetFlagByName(name, value);
+        }
       }
     }
   }
