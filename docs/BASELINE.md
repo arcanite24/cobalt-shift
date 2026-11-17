@@ -474,12 +474,17 @@ other non-zero viewports are 128x128 tiles in 512x512 targets and already
 at their own sizes. `cobalt_viewport_log` logs the viewports and callers.
 
 "PLACE" next to the position is a label that fades in and out, at both
-sizes. One 540p capture out of three showed a reddish tint over the right
-half of the frame; not seen at 720p, and the next capture was clean.
+sizes. One 540p capture out of five (frames 8700-9600) came out darker, with a
+warm cast toward the right: the whole frame's colour shifted, not a band,
+so likely an exposure state caught mid-change. Not seen at 720p.
 
 With the HUD complete, blindvac (UHD 620, `cobalt_low_end`, vsync off, 30 s):
 960x540 ran 38.9 and 39.4 fps (1.93, 1.90 cores) against 32.4 fps (1.62
 cores) at 720p in between, +21 %. p95 frames stay at 33.7-33.9 ms.
+
+`cobalt_low_end` now sets `cobalt_scene_size=960x540` (the command line or
+config file still wins; `--cobalt_scene_size=` keeps 720p). Plain
+`--cobalt_low_end=true` with vsync off: 40.4 and 38.7 fps on blindvac.
 
 Diagnostics: `cobalt_scene_probe` logs the headers, and
 `cobalt_scene_keep_mask` leaves chosen ones at 720p.
