@@ -22,6 +22,7 @@ REXCVAR_DEFINE_BOOL(cobalt_low_end, false, "Cobalt",
     .lifecycle(rex::cvar::Lifecycle::kRequiresRestart);
 
 #include "pad_script.h"
+#include "scene_size.h"
 #include "utility_drive.h"
 
 class CobaltShiftApp : public rex::ReXApp {
@@ -121,6 +122,10 @@ class CobaltShiftApp : public rex::ReXApp {
     cobalt::InstallPadScript(
         static_cast<rex::input::InputSystem*>(runtime()->input_system()));
   }
+
+  // The image is in memory and no guest code has run: the scene size (#23)
+  // edits its static tiling records here.
+  void OnPostLoadXexImage() override { cobalt::ApplySceneSize(); }
 
   // --perf_log_csv=<path> writes one row of the SDK's counters per frame;
   // the SDK leaves opening it to the app.

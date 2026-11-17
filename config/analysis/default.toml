@@ -82,3 +82,13 @@ size = 0x15C
 size = 0xAC
 [functions."829D5508"]
 size = 0x1F8
+
+# Scene size (#23, cobalt_scene_size): FM3's screen setup (sub_822A5670)
+# builds the screen textures' D3D headers in the renderer from its 1280x720
+# screen size. At its epilogue (r31 the renderer), shrink the headers'
+# fetch-constant size to the scene size, keeping their 720p memory and
+# pitch, as Pinyon Shift does for FH1 (src/scene_size.cpp).
+[[midasm_hook]]
+address = 0x822A5908
+name = "CobaltSceneTexturesMade"
+registers = ["r31"]

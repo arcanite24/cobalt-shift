@@ -40,6 +40,7 @@ set(COBALT_SHIFT_SOURCES
     src/utility_drive.cpp
     src/pad_script.cpp
     src/ring_wait.cpp
+    src/scene_size.cpp
 )
 
 if(WIN32)
