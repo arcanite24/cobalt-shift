@@ -38,9 +38,26 @@ USA, title ID `4D53084D`.
    the PPC context in memory around each one. ReXenon replaced these
    accesses with relaxed atomics and measured **−17 % main-thread CPU
    and +10–30 % fps on a Ryzen 7 5800X**, the same CPU as multivac. The
-   first A/B is one flag (`-fno-ms-volatile` on the generated units).
-   It also concerns FH1 and FH2. Android and Linux builds are not
-   affected: the flag is on by default only for x86 MSVC targets.
+   A/B is one flag (`-fno-ms-volatile` on the generated units), once
+   the barriers below are in. It also concerns FH1 and FH2.
+   - **Ordering is the catch.** On x86, ShiftGlue's `sync`, `lwsync`,
+     `eieio` and `isync` compile to nothing (`REX_PPC_SYNC()` is
+     `((void)0)` unless `REX_ARCH_ARM64`, in
+     `resources/templates/codegen/pch_h.inja`). On Windows today, MS
+     volatile is the only thing that stops the compiler from reordering
+     guest stores across the game's lock-free code.
+   - **So the first step is compiler barriers for the guest barriers.**
+     Map `lwsync`/`eieio`/`isync` to `__atomic_signal_fence` (no
+     instruction emitted) and `sync` to a real fence. Only then turn on
+     `-fno-ms-volatile`.
+   - `lwarx`/`stwcx.` are already a `std::atomic` compare-exchange with
+     acq_rel ordering, so they are safe either way.
+   - **Linux x64 (the Deck) already runs this way.** We checked with
+     `clang++ -###`: neither Linux x64 nor Android turns on
+     `-fms-volatile`. Android is fine, because its ARM64 barriers are
+     real fences. Linux x64 has had no compiler ordering for guest memory
+     at all. That is weak evidence the games tolerate it. It also means
+     the Deck builds need the barriers too.
 2. **The stack decision is the user's and should be settled by a
    measurement.** There are two routes; see
    [The fork in the road](#the-fork-in-the-road).
@@ -49,10 +66,12 @@ USA, title ID `4D53084D`.
    - **Route B:** ReGPU through Glue2GPU, on D3D12 and Windows only.
      It is about 2.2x faster at 1440p and 4K on strong GPUs, but its
      CPU side loses on weak laptops.
-3. **Stage 0 has a blocker on Route A.** Two independent projects report
-   that ReXGlue's Vulkan backend does not render FM3 correctly
+3. **Stage 0 risk on Route A.** Two independent projects report that
+   **stock** ReXGlue's Vulkan backend does not render FM3 correctly
    (hl360-forza3 README; FM3-ReGPU `FM3-QUIRKS.md` Q21). They also
-   report that `readback_resolve=full` caps FM3 at 30 fps (Q18). Nothing
+   report that `readback_resolve=full` caps FM3 at 30 fps (Q18).
+   ShiftGlue renders through Pinyon's own executor (`rexgpu-fh1`), which
+   has never run FM3, so this is not yet a known blocker for us. Nothing
    else can be measured until FM3 renders on Vulkan.
 4. **FM3 is Turn 10's engine, not Playground's.** FH1 and FH2 grew out
    of it, but nobody has measured how much code they share. Every
@@ -72,9 +91,9 @@ USA, title ID `4D53084D`.
 | | Route A: ShiftGlue + Vulkan | Route B: ReGPU via Glue2GPU |
 |---|---|---|
 | Graphics API | Vulkan everywhere | **D3D12 only**. Linux only through vkd3d-proton, which hangs the GPU about 2 s in on RADV (ReGPU `docs/linux-vkd3d-proton.md`). No Android or macOS |
-| FM3 status | **Renders wrongly** on ReXGlue's Vulkan backend (Q21, hl360). Needs a stage-0 fix | Renders well; FM3-ReGPU ships at 300–360 fps at 1440p 4x on a 9800X3D + 7900 XTX |
-| Fast GPU, high resolution | FH1 on ReXGlue D3D12, RTX 4070: 1440p 67 fps, 4K 36 | Same machine: 1440p 91, 4K **79–86** (Glue2GPU README) |
-| Weak, CPU-limited laptop | FH1R's own Vulkan renderer: 52 fps (GTX 1650 Ti) | ReGPU: 36 fps; "its limit there is its CPU side" (secondhand, from FM3-ReGPU `RESEARCH.md`) |
+| FM3 status | Reported broken on **stock** ReXGlue Vulkan (Q21, hl360). ShiftGlue's `rexgpu-fh1` executor not tried on FM3 | Renders well; FM3-ReGPU ships at 300–360 fps at 1440p 4x on a 9800X3D + 7900 XTX |
+| Fast GPU, high resolution | **No ShiftGlue figure yet.** Proxy: FH1 on stock ReXGlue **D3D12**, RTX 4070: 1440p 67 fps, 4K 36 | Same machine: 1440p 91, 4K **79–86** (Glue2GPU README) |
+| Weak, CPU-limited laptop | **No ShiftGlue figure yet.** Proxy: FH1R's *own* Vulkan renderer, 52 fps (GTX 1650 Ti) | ReGPU: 36 fps; "its limit there is its CPU side" (secondhand, from FM3-ReGPU `RESEARCH.md`) |
 | EDRAM | Xenia-style: exact formats, ownership transfers (30–37 % of the GPU frame in FH1R) | One RGBA16F host surface per EDRAM base, D32S8 depth, no transfers. Less exact, much cheaper |
 | Our rules | Fits: one SDK, Vulkan, handhelds | Breaks "Vulkan everywhere" and the handheld targets |
 | Code size | about 254k lines of renderer (Glue2GPU's count) | about 16–21k lines; one main author |
@@ -127,7 +146,7 @@ one-to-one to a 4080 at 60 fps.
 
 | ID | Item | Their result | Trade | Bucket |
 |---|---|---|---|---|
-| **CB-1** | **Guest loads and stores without MS volatile semantics.** Step 1: `-fno-ms-volatile` on the generated units. Step 2: ReXenon's relaxed `std::atomic_ref` loads and stores | ReXenon/FM2: **−17 % main-thread CPU, +10–30 % fps (5800X)**; 1–2 % on an FX-8350 | Ordering comes only from guest `sync`/`lwsync`/`eieio`. Under ISO volatile x86 still keeps hardware TSO; ARM64 needs explicit fences. Pinyon's "stack without volatile, 7–9 % slower" was a different change and does not rule this out | **New [SDK/BUILD]**, also FH1/FH2 |
+| **CB-1** | **Guest loads and stores without MS volatile semantics.** Step 0: on x86, make `sync`/`lwsync`/`eieio`/`isync` real compiler barriers (today they are no-ops). Step 1: `-fno-ms-volatile` on the generated units. Step 2: ReXenon's relaxed `std::atomic_ref` loads and stores | ReXenon/FM2: **−17 % main-thread CPU, +10–30 % fps (5800X)**; 1–2 % on an FX-8350 | Ordering comes only from guest `sync`/`lwsync`/`eieio`. Under ISO volatile x86 still keeps hardware TSO; ARM64 needs explicit fences. Pinyon's "stack without volatile, 7–9 % slower" was a different change and does not rule this out | **New [SDK/BUILD]**, also FH1/FH2 |
 | CB-2 | Pin the load address and link order when benchmarking (disable ASLR for A/B builds) | ReXenon: placement moved fps 3–10 %, more than most micro-optimisations | none | **New** (method) |
 | CB-3 | PGO on the GPU front end and runtime only, not the game code | FM3-ReGPU: +3.2 % on the ReGPU target. Game-code PGO +0.4 %, dropped. Glue2GPU: about +6 % | Profile goes stale (theirs did) | **Re-measure**: Pinyon measured PGO at −0.13 to −0.72 %, but over everything |
 | CB-4 | Fixed FP mode on x86 | Lavender: process CPU 104.0 → 86.6 ms a frame in AI free roam (one run, inside 9 % noise) | Rounding and denormals differ | **Re-measure**: rejected as a default under exactness rules; perf-first rules make it a candidate again |
@@ -229,9 +248,9 @@ one-to-one to a 4080 at 60 fps.
 
 1. **CB-0.1 → CB-0.2 → CB-0.5.** Boot FM3, then measure how much code
    it shares with FH1 and build the benchmark scene.
-2. **CB-1 now, on Lavender.** It needs no FM3 work. A one-flag A/B on
-   FH2's AI free-roam route at a pinned load address (CB-2) gives the
-   answer.
+2. **CB-1 now, on Lavender.** It needs no FM3 work: barriers first, then
+   an A/B with the flag on FH2's AI free-roam route, with the load
+   address pinned (CB-2).
 3. **CB-0.3 and CB-0.4.** Choose the route; on Route A, make FM3
    render.
 4. CPU front end: **CB-6/7 → CB-8 → CB-10 → CB-33 → CB-11..14**.
