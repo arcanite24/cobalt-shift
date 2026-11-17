@@ -84,6 +84,34 @@ CPU per frame held steady, so read the results from it:
 - **What's left is the GPU front end.** "GPU Commands" (PM4 decode) at 0.6
   of a core and "GPU Submission" at 0.25 now make up half the process.
 
+### The GPU front end is work, not spinning
+
+With the command processor's idle spin and WAIT_REG_MEM yield off
+(`--gpu_idle_spin_count=0 --wait_reg_mem_yield_us=0`), "GPU Commands" stayed
+at 0.63 of a core and the process at 1.79 cores. That is about 10.5 ms of CPU
+a frame for about 2,080 draws, roughly 5 us a draw; FM3-ReGPU quotes about
+1 us for its draw thread.
+
+`tools/sample_threads.ps1` samples a thread's instruction pointer about
+1,000 times a second and names functions from linker maps (`/MAP`, now on for
+every binary). Fifteen seconds of "GPU Commands" on the grid, by share of
+wall-clock samples:
+
+| share | where |
+|---|---|
+| 33.8 % | `ntdll` (waits and syscalls) |
+| 10.2 % | `VCRUNTIME140` (`memcpy`/`memset`) |
+| 7.3 % | `VulkanCommandProcessor::IssueDrawImpl` |
+| 6.0 % | `WriteRegistersFromMem` / `PacketWriteRegistersFromMem` (register loads from memory) |
+| 4.3 % | `CommandProcessor::ExecutePacket` |
+| 3.2 % | `UpdateBindings` |
+| 2.5 % | an EH funclet in `rexgpu-fh1` |
+| 1.4 % each | `copy_and_swap_32_unaligned`, `UpdateSystemConstantValues` |
+| ~25 % | a long tail of 1 % entries: texture requests, `Fh1NativeExecutor` target binding, shader cache, dynamic state |
+
+"GPU Submission" is 98 % inside the NVIDIA driver and `ntdll`. No single
+hotspot: the cost is the per-draw Xenos emulation, spread across the path.
+
 ## The generated code was being compiled at -O0
 
 The rebuild for CB-1 came out three times larger (`.text` 36 -> 103 MB). On

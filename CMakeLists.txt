@@ -20,6 +20,13 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
                         $<$<CONFIG:RelWithDebInfo>:-O2>)
 endif()
 
+# A linker map beside each binary (the SDK's DLLs included), so
+# tools/sample_threads.ps1 can name the functions a thread spends its time in
+# without debug info.
+if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_link_options(-Wl,/MAP)
+endif()
+
 # Stage 0 is a measuring build (--perf_log_csv), as Pinyon and Lavender's are.
 option(COBALT_SHIFT_PERF_COUNTERS "Compile ShiftGlue's per-frame perf counters" ON)
 if(COBALT_SHIFT_PERF_COUNTERS)
