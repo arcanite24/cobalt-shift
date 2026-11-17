@@ -388,3 +388,28 @@ Its busy part is register writes from memory (`PacketWriteRegistersFromMem`
 `IssueDrawImpl` 14 %, `UpdateBindings` 7 %, waits and wakes 14 %. The rest
 is the hand-off between the guest render thread, decoder and recorder, plus
 the per-draw cuts already filed (#9, #11).
+
+## Scene size 960x540 (#23, experimental, 2026-11-17)
+
+`--cobalt_scene_size=960x540` renders the race scene at 960x540 the way
+Pinyon Shift does for FH1 (`src/scene_size.cpp`): FM3's tiling bands are
+scaled, and at the end of its screen setup (`sub_822A5670`) the screen
+textures' fetch sizes are shrunk to the scene size while their memory stays
+720p. The renderer's screen size is set to it too, so viewports follow and
+the presenter scales the smaller front buffer up. Off by default.
+
+blindvac (UHD 620) with `cobalt_low_end`, parked on the grid, 30 s:
+
+| | fps | frame ms p50 / p95 / p99 | cores |
+|---|---|---|---|
+| 1280x720 | 32.6 | 33.2 / 33.8 / 34.3 | 1.50 |
+| 960x540 | 44.3 (+36 %) | 18.0 / 33.5 / 33.8 | 1.98 |
+
+Frames land on one or two 60 Hz vblanks, so 540p alternates between 60
+and 30 fps here. The UI lays out at 960x540, but the minimap, the gear and
+the speed readout are missing: they come back only with the screen texture
+at renderer+480 (the scene colour target) left at 720p, which breaks the
+scene, so the HUD widgets likely live in that surface outside its top-left
+960x540. That has to be fixed before 540p can join the low-end preset.
+Diagnostics: `cobalt_scene_probe` logs the headers, `cobalt_scene_keep_mask`
+leaves chosen ones at 720p.
