@@ -379,3 +379,12 @@ itself when `pinyon_shift_fh1_render_fps_limit` is above 30 (the frame cap
 raised) and `cobalt_low_end` is off. At the default cap it would only cost
 CPU, so it stays off there; the command line or config file still decides
 when set.
+
+Sampled with the split (uncapped, 293 fps): the decoder spends about 30 % of
+its samples sleeping or waiting (`ZwDelayExecution` 20 %,
+`ZwWaitForAlertByThreadId` 11 %), so it is no longer the limit on its own.
+Its busy part is register writes from memory (`PacketWriteRegistersFromMem`
+13 %, `RecordRegisterRun` 5 %, `FindRegisterChange` 4 %). The recorder:
+`IssueDrawImpl` 14 %, `UpdateBindings` 7 %, waits and wakes 14 %. The rest
+is the hand-off between the guest render thread, decoder and recorder, plus
+the per-draw cuts already filed (#9, #11).
