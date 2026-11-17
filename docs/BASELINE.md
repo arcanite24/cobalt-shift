@@ -302,3 +302,16 @@ so a per-shader lever fits this track. Whether other tracks have their own
 
 `--cobalt_low_end=true` with `anisotropic_override=-1` added: 31.4 fps
 unprofiled (30.3 without it).
+
+Between all and none: `fh1_skip_pixel_shaders_keep_every=N` still draws one
+in N of the matching draws. With the low-end preset:
+
+| `8FEC` draws kept | fps | Image |
+|---|---|---|
+| all (defaults) | 17.9 | full |
+| 1 in 2 | 23.0 | |
+| 1 in 3 | 24.9 | `docs/images/uhd620-grid-keep3.png`: flowers mostly there, flags right |
+| none (preset) | 31.4 | flowers gone, two flags black |
+
+Only skipping them all holds 30 fps, so the preset keeps that. Keeping 1 in 3
+is the option for a better image on the same GPU.
