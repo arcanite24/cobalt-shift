@@ -389,6 +389,47 @@ Its busy part is register writes from memory (`PacketWriteRegistersFromMem`
 is the hand-off between the guest render thread, decoder and recorder, plus
 the per-draw cuts already filed (#9, #11).
 
+## Untiled scene and FM3-ReGPU's cuts (2026-11-17)
+
+`fh1_untile_predicated_tiling` (SDK; on by default only on Linux and macOS)
+draws FM3's predicated-tiling scene once instead of once a tile. Cobalt now
+turns it on. On multivac, grid route:
+
+| Run | fps | CPU per frame | cores busy | draws/frame |
+|---|---|---|---|---|
+| uncapped, tiled | 250.0 | 16.1 ms | 4.03 | 1,975 |
+| uncapped, untiled, two runs | 265.1, 256.3 | 14.7, 15.0 ms | 3.89, 3.84 | 1,502 |
+| 60 fps cap, tiled, two runs | 60.0 | 31.7, 31.3 ms | 1.95, 1.89 | |
+| 60 fps cap, untiled, two runs | 60.0 | 29.5, 17.1 ms | 1.79, 1.03 | |
+
+The images match (`bench-capA.png`, `bench-capT.png`). The cap runs are
+noisy, but every untiled run used less CPU.
+
+`src/render_rates.cpp` ports four of FM3-ReGPU's cuts, all hot-reloadable
+and off by default:
+
+- `cobalt_shadow_rate`: car shadow maps every Nth frame.
+- `cobalt_reflect_rate`: the cars' reflection cube faces every Nth time.
+- `cobalt_mirror_rate`: the rear-view mirror every Nth frame.
+- `cobalt_far_car_lod`: detail level for AI cars beyond the nearest two.
+
+On multivac uncapped, shadows and reflections at rate 2 took the draws from
+1,975 to 1,875 a frame, but the fps change (264 -> 272) is within noise. On
+blindvac with the low-end preset and vsync off (two runs each):
+
+| Run | fps | p95 frame | cores busy |
+|---|---|---|---|
+| low-end | 30.4, 30.2 | 34.2, 34.2 ms | 1.59, 1.47 |
+| + untiled | 30.2, 29.4 | 34.8, 47.7 ms | 1.46, 1.48 |
+| + untiled + cuts (2, 2, 2, LOD 3) | 31.4, 31.5 | 33.9, 33.9 ms | 1.56, 1.40 |
+
+The UHD 620 is GPU-bound here, so untiling saves only a little CPU. The
+cuts add a frame a second and remove the 48 ms frames, so `cobalt_low_end`
+now sets all four. Shadows, reflections and the mirror can be one frame old;
+mid-distance AI cars lose small details. With the new defaults, plain
+`--cobalt_low_end=true` (vsync off) ran 32.2 and 32.3 fps, p95 33.9 ms, 1.57
+and 1.47 cores.
+
 ## Scene size 960x540 (#23, experimental, 2026-11-17)
 
 `--cobalt_scene_size=960x540` renders the race scene at 960x540 the way

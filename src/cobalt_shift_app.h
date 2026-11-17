@@ -70,11 +70,17 @@ class CobaltShiftApp : public rex::ReXApp {
     // about 17 MB and 390 uploads, each ending the open rendering. Write
     // watches already catch the CPU's writes to uploaded pages; off, uploads
     // fall to about 40 KB a frame (docs/BASELINE.md). Lavender sets it too.
+    //
+    // fh1_untile_predicated_tiling (the SDK's default on Linux and macOS
+    // only) draws FM3's predicated-tiling scene once instead of once a tile:
+    // 1,975 -> 1,502 draws a frame on the grid, about 7 % less CPU a frame
+    // uncapped on the 5800X (250 -> 256-265 fps), and the same image.
     for (const auto& [name, value] : {std::pair{"pinyon_shift_fh1_render_fps_limit", "30"},
                                       std::pair{"gpu_read_pointer_publish_dwords", "1024"},
                                       std::pair{"clear_memory_page_state", "false"},
                                       std::pair{"spirv_implicit_lod_2d", "true"},
-                                      std::pair{"spirv_fast_pixel_math", "true"}}) {
+                                      std::pair{"spirv_fast_pixel_math", "true"},
+                                      std::pair{"fh1_untile_predicated_tiling", "true"}}) {
       if (rex::cvar::GetFlagSource(name) == rex::cvar::Source::kDefault) {
         rex::cvar::SetFlagByName(name, value);
       }
@@ -86,11 +92,18 @@ class CobaltShiftApp : public rex::ReXApp {
     // test: a third of its frame. Skipping it took the grid from 17.9 to
     // 30.5 fps there. A positive mip LOD bias gained nothing and turns the
     // road pink. The SDK forces 4x anisotropic filtering; the game's own
-    // setting (-1) saved 7 % of the UHD 620's frame.
+    // setting (-1) saved 7 % of the UHD 620's frame. FM3-ReGPU's cuts
+    // (src/render_rates.cpp): car shadows, reflections and the mirror every
+    // other frame and distant AI cars at detail level 3 took the UHD 620's
+    // grid from 30.3 to 31.5 fps, with p95 frames from 34-48 to 33.9 ms.
     if (REXCVAR_GET(cobalt_low_end)) {
       for (const auto& [name, value] :
            {std::pair{"fh1_skip_pixel_shaders", "8FEC358DC5728647"},
-            std::pair{"anisotropic_override", "-1"}}) {
+            std::pair{"anisotropic_override", "-1"},
+            std::pair{"cobalt_shadow_rate", "2"},
+            std::pair{"cobalt_reflect_rate", "2"},
+            std::pair{"cobalt_mirror_rate", "2"},
+            std::pair{"cobalt_far_car_lod", "3"}}) {
         if (rex::cvar::GetFlagSource(name) == rex::cvar::Source::kDefault) {
           rex::cvar::SetFlagByName(name, value);
         }
