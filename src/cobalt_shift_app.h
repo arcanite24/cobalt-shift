@@ -6,6 +6,8 @@
 #include <rex/perf/counter.h>
 #include <rex/rex_app.h>
 
+#include "utility_drive.h"
+
 class CobaltShiftApp : public rex::ReXApp {
  public:
   using rex::ReXApp::ReXApp;
@@ -22,6 +24,11 @@ class CobaltShiftApp : public rex::ReXApp {
     if (config.gpu_plugin.empty()) {
       config.gpu_plugin = "fh1";
     }
+  }
+
+  // FM3 streams replays to cache: (FM3-QUIRKS Q8).
+  void OnPreLaunchModule() override {
+    cobalt::MountUtilityDrive(runtime(), user_data_root());
   }
 
   // --perf_log_csv=<path> writes one row of the SDK's counters per frame;

@@ -10,4 +10,4 @@ game_root = ".local/game/codegen"
 [entrypoint]
 file_path = ".local/game/codegen/default.xex"
 out_directory_path = ".local/generated/default"
-includes = ["config/analysis/default.toml"]
+includes = ["config/analysis/default.toml", "config/analysis/thunks-default.toml"]
