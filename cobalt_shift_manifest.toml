@@ -1,0 +1,13 @@
+# Cobalt Shift codegen manifest: Forza Motorsport 3 Ultimate Collection (USA),
+# default.xex v0.0.0.8. tools/cobalt_setup.py puts it in .local/game/codegen.
+# Game inputs and translated output stay in the ignored .local folder.
+
+[project]
+name = "cobalt_shift"
+sdk_version = "0.10.0"
+game_root = ".local/game/codegen"
+
+[entrypoint]
+file_path = ".local/game/codegen/default.xex"
+out_directory_path = ".local/generated/default"
+includes = ["config/analysis/default.toml"]

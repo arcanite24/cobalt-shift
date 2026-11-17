@@ -1,0 +1,79 @@
+# Codegen facts for Forza Motorsport 3 Ultimate Collection (USA), default.xex
+# v0.0.0.8 (title 4D53084D, SHA-256 aa15372c...b8742). Stage 0 reference build.
+#
+# Addresses come from FM3-ReGPU (MIT, github.com/braaap-stututu/FM3-ReGPU at
+# 1b26d9e, config/fm3.toml and src/hooks/addresses.h), which analysed the same
+# image; its quirk numbers (Qn) refer to its FM3-QUIRKS.md.
+
+# Q1: Microsoft CRT non-local jump pair (the FM4 CRT layout).
+setjmp_address = 0x82534B20
+longjmp_address = 0x825345E0
+
+# Pinyon's exact codegen options, kept for every game on ShiftGlue.
+cr_as_local = true
+ctr_as_local = true
+xer_as_local = true
+interior_resume = false
+direct_calls_bypass_thunk = true
+fold_rodata_loads = true
+host_local_register_saves = true
+host_local_lr = true
+
+# XAPI fibers, served by the SDK. SwitchToFiber is the export thunk
+# 0x82A7B2B8 (b 0x82A82210, the hand-written register swap).
+[rexcrt]
+ConvertThreadToFiber = 0x82A7B098
+ConvertFiberToThread = 0x82A7B128
+CreateFiber = 0x82A7B178
+DeleteFiber = 0x82A7B258
+SwitchToFiber = 0x82A7B2B8
+
+# Function boundaries .pdata omits (FM3-ReGPU config/fm3.toml).
+# Q7: the register swap behind SwitchToFiber (no .pdata) and the new-fiber
+# start trampoline CreateFiber puts in LR.
+[functions."82A82210"]
+size = 0x40C
+[functions."82A82200"]
+size = 0x10
+
+# Q2: tail-call / vtable-only thunks and refcount leaves.
+[functions."82576940"]
+size = 0x4C
+[functions."8254ABF0"]
+size = 0x24
+[functions."82A97418"]
+size = 0x24
+[functions."82B123E0"]
+size = 0x04
+[functions."828DCE98"]
+size = 0x08
+[functions."82B14310"]
+size = 0x08
+[functions."826E0998"]
+size = 0x18
+[functions."82713848"]
+size = 0x18
+[functions."82AB2668"]
+size = 0x18
+[functions."82A07F68"]
+size = 0x4C
+[functions."82A60EF0"]
+size = 0x28
+
+# Q3: leaves with a tail-merged "li r3,0; blr" exit after the first blr.
+[functions."8295AB20"]
+size = 0x80
+[functions."8295ABA0"]
+size = 0x3C
+[functions."82971FE0"]
+size = 0x74
+[functions."829720D8"]
+size = 0x74
+
+# Leaves without .pdata that hold a byte-offset jump table.
+[functions."82354668"]
+size = 0x15C
+[functions."825F16B8"]
+size = 0xAC
+[functions."829D5508"]
+size = 0x1F8
