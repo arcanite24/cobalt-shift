@@ -281,11 +281,24 @@ crowds, flags) cheaper, measured unprofiled on the grid (defaults: 17.9 fps):
 | Pipeline alpha to coverage, no kill in the shader | 18.1 | cut-outs right, road corrupted (cyan streaks) |
 | Kill kept, no depth write for these draws | 16.7 | not captured |
 
-The 1x hardware path is no faster than the kill, and dropping depth writes
-gains nothing, so early depth tests are not what's missing. The cost is the
-overdraw itself: an opaque quad hides the layers behind it, a cut-out one
-doesn't, and every layer gets shaded. A correct image has to pay for that, so
-on this GPU the levers are drawing less foliage (the low-end preset skips
-`8FEC`, 30.5 fps) or shading fewer pixels. The hardware path and the
-depth-write option were not kept; `fh1_debug_alpha_to_mask_off` stays as a
-diagnostic.
+The results fit overdraw as the cost: an opaque quad hides the layers behind
+it, a cut-out one doesn't, and every layer gets shaded. They don't prove it.
+The opaque row clears the guest's alpha-to-coverage bit, which other paths
+also check. Nothing confirmed that the no-kill row's shaders and pipelines
+were the ones intended (no shader dump; the road corruption suggests
+something else changed too). The no-depth-write row has no image. So
+"hardware alpha to coverage doesn't help on this GPU" holds for these builds
+only. What is solid: the low-end preset's skip of `8FEC` (30.5 fps) is the
+only change here that kept a usable image, and shading fewer pixels is the
+other lever (#23). The hardware path and the depth-write option were not
+kept; `fh1_debug_alpha_to_mask_off` stays as a diagnostic.
+
+Per-draw GPU profile (`fh1_native_gpu_profile_draws`, profiled so slower
+overall), emulation on vs `fh1_debug_alpha_to_mask_off`: `8FEC` 24.4 ms ->
+1.5 ms over its 21 draws a frame. The next alpha-to-coverage shaders move by
+1-2 ms (`033347E3` 3.9 -> 2.1, `1B9530D4` 1.9 -> 0.7). The cost is one shader,
+so a per-shader lever fits this track. Whether other tracks have their own
+`8FEC` is not measured.
+
+`--cobalt_low_end=true` with `anisotropic_override=-1` added: 31.4 fps
+unprofiled (30.3 without it).
