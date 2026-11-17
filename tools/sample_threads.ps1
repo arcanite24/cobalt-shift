@@ -91,14 +91,60 @@ function Load-Map($module) {
     $module.Syms = [string[]]@($sorted | ForEach-Object Name)
 }
 
+# Modules without a map (ntdll, the driver): the nearest export before the
+# address, read from the file's export table. Internal functions show as the
+# export just before them, so treat those names as approximate.
+function Load-Exports($module, [string]$file) {
+    $bytes = [IO.File]::ReadAllBytes($file)
+    $pe = [BitConverter]::ToInt32($bytes, 0x3C)
+    $optional = $pe + 24
+    $sections = $optional + [BitConverter]::ToUInt16($bytes, $pe + 20)
+    $sectionCount = [BitConverter]::ToUInt16($bytes, $pe + 6)
+    $toOffset = {
+        param([uint32]$rva)
+        for ($s = 0; $s -lt $sectionCount; $s++) {
+            $h = $sections + 40 * $s
+            $va = [BitConverter]::ToUInt32($bytes, $h + 12); $size = [BitConverter]::ToUInt32($bytes, $h + 8)
+            if ($rva -ge $va -and $rva -lt $va + [Math]::Max($size, [BitConverter]::ToUInt32($bytes, $h + 16))) {
+                return [int]($rva - $va + [BitConverter]::ToUInt32($bytes, $h + 20))
+            }
+        }
+        return -1
+    }
+    $exportRva = [BitConverter]::ToUInt32($bytes, $optional + 112)   # PE32+ data directory 0
+    $entries = New-Object 'System.Collections.Generic.List[object]'
+    if ($exportRva) {
+        $e = & $toOffset $exportRva
+        $nameCount = [BitConverter]::ToUInt32($bytes, $e + 24)
+        $functions = & $toOffset ([BitConverter]::ToUInt32($bytes, $e + 28))
+        $names = & $toOffset ([BitConverter]::ToUInt32($bytes, $e + 32))
+        $ordinals = & $toOffset ([BitConverter]::ToUInt32($bytes, $e + 36))
+        for ($i = 0; $i -lt $nameCount; $i++) {
+            $nameOffset = & $toOffset ([BitConverter]::ToUInt32($bytes, $names + 4 * $i))
+            $end = [Array]::IndexOf($bytes, [byte]0, $nameOffset)
+            $ordinal = [BitConverter]::ToUInt16($bytes, $ordinals + 2 * $i)
+            $entries.Add([pscustomobject]@{ Rva = [uint64][BitConverter]::ToUInt32($bytes, $functions + 4 * $ordinal);
+                Name = [Text.Encoding]::ASCII.GetString($bytes, $nameOffset, $end - $nameOffset) })
+        }
+    }
+    $sorted = $entries | Sort-Object Rva
+    $module.Rvas = [uint64[]]@($sorted | ForEach-Object Rva)
+    $module.Syms = [string[]]@($sorted | ForEach-Object Name)
+}
+$files = @{}
+foreach ($m in $process.Modules) { $files[$m.ModuleName] = $m.FileName }
+
 $counts = @{}
 foreach ($ip in $samples) {
     $module = $modules | Where-Object { $ip -ge $_.Base -and $ip -lt $_.End } | Select-Object -First 1
     $name = '?'
     if ($module) {
         $name = $module.Name
-        if ($module.Map) {
-            if ($null -eq $module.Rvas) { Load-Map $module }
+        if ($null -eq $module.Rvas) {
+            if ($module.Map) { Load-Map $module }
+            else { try { Load-Exports $module $files[$module.Name] } catch { $module.Rvas = [uint64[]]@() } }
+        }
+        if ($module.Rvas.Count) {
             $rva = $ip - $module.Base
             $i = [Array]::BinarySearch($module.Rvas, $rva)
             if ($i -lt 0) { $i = (-bnot $i) - 1 }

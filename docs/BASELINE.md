@@ -327,3 +327,32 @@ at the first turn; no image, the capture swap was never reached):
 
 Away from the grid the scene is lighter, and the preset stays above 30 fps.
 Other tracks are not measured yet.
+
+## Uncapped on multivac, current defaults (2026-11-17, evening)
+
+Same grid, `--pinyon_shift_fh1_render_fps_limit=180 --host_present_fps_limit=0
+--vsync=false`, at the current defaults (with `spirv_implicit_lod_2d` and
+`spirv_fast_pixel_math` on, added after the c-* table above):
+
+| `gpu_read_pointer_publish_dwords` | fps | p99 frame |
+|---|---|---|
+| 1024 (default), two runs | 206.5, 215.4 | 7.4 ms |
+| 4096 | 216.0 | 7.3 ms |
+| 16384 | 219.8 | 7.1 ms |
+
+The publish interval is within run-to-run noise, so the default stays. The
+limit is the GPU Commands thread at 0.99 cores. The GPU frame is about 5 ms,
+with idle gaps waiting for the CPU.
+
+Sampled (`tools/sample_threads.ps1`, which now names exports in modules
+without a map, such as ntdll and the driver), the thread's time spreads over
+the draw path: `IssueDrawImpl` 10 %, `ExecutePacket` 7 %, `UpdateBindings`
+6 %, register writes from memory 8 %, memcpy about 6 %, and
+`NtAlertThreadByThreadId` (waking another thread) 6 %. Write-watch protection
+costs about 84 µs a frame. No single item is large: the remaining CPU levers
+are the per-draw cuts already filed (#9, #11, #14).
+
+For #3: FM3-ReGPU reports 300-360 fps in races on a 9800X3D + 7900 XTX at
+1440p 4x MSAA. This is 215 fps on a 5800X + RTX 4080 at 720p. That's not the
+same machine or scene, so it doesn't decide anything. The like-for-like run
+needs FM3-ReGPU built here.
