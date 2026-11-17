@@ -14,7 +14,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$process = Get-Process -Name 'cobalt_shift' -ErrorAction Stop | Select-Object -First 1
+$process = Get-Process -Name 'cobalt_shift*' -ErrorAction Stop | Select-Object -First 1
 if ($Commands.Count) { Set-Content -LiteralPath (Join-Path $root '.local/user/pad.txt') -Value ($Commands -join "`n") }
 Start-Sleep -Milliseconds ([int]($Wait * 1000))
 & (Join-Path $PSScriptRoot 'window_shot.ps1') -ProcessId $process.Id -Path (Join-Path $root ".local/logs/$Shot.png")

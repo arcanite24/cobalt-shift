@@ -7,7 +7,9 @@ param(
     # Extra cvars, e.g. '--log_level=debug'.
     [string[]]$GameArguments = @(),
     # Wait for the game to exit and return its exit code.
-    [switch]$Wait
+    [switch]$Wait,
+    # Another executable in the build folder, for A/B runs (e.g. cobalt_shift_msvol.exe).
+    [string]$Executable = 'cobalt_shift.exe'
 )
 
 # Starts the Stage 0 reference build against the extracted Disc 1:
@@ -17,13 +19,13 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $preset = 'win-amd64-' + $Configuration.ToLowerInvariant()
-$exe = Join-Path $root "out/build/$preset/cobalt_shift.exe"
+$exe = Join-Path $root "out/build/$preset/$Executable"
 if (-not (Test-Path -LiteralPath $exe)) { throw "Build first: $exe" }
 $disc = Join-Path $root '.local/game/disc'
 if (-not (Test-Path -LiteralPath $disc)) { throw "Run tools/cobalt_setup.py disc first: $disc" }
 if (-not $UserRoot) { $UserRoot = Join-Path $root '.local/user' }
 $UserRoot = (New-Item -ItemType Directory -Force -Path $UserRoot).FullName
-if (Get-Process -Name 'cobalt_shift' -ErrorAction SilentlyContinue) {
+if (Get-Process -Name 'cobalt_shift*' -ErrorAction SilentlyContinue) {
     throw 'cobalt_shift is already running.'
 }
 $arguments = @("--game_data_root=$disc", "--user_data_root=$UserRoot", '--gpu_backend=vulkan',

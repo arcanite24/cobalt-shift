@@ -21,6 +21,7 @@ set(COBALT_SHIFT_SOURCES
     src/main.cpp
     src/utility_drive.cpp
     src/pad_script.cpp
+    src/ring_wait.cpp
 )
 
 if(WIN32)
