@@ -133,23 +133,22 @@ of every page the CPU uploaded at each frame end, so all of FM3's geometry
 went up again every frame. Write watches already catch real CPU writes to
 uploaded pages. Lavender Shift turns it off too, and now Cobalt does.
 
-| Run | Change | frames/s | cores | CPU ms/frame | GPU ms p50 | uploads/frame |
-|---|---|---|---|---|---|---|
-| h-unc-off | uncapped, page state cleared (old default) | 86.7 | 3.10 | 35.8 | 11.0 | 17.3 MB, 392 splits |
-| k-unc | uncapped, `clear_memory_page_state=false` | 92.0 | 2.78 | 30.2 | 7.6 | 42 KB, 7 splits |
-| g-cb1ring | 60 cap, page state cleared | 58.5 | 1.76 | 30.2 | | |
-| k-cap | 60 cap, `clear_memory_page_state=false` | 59.8 | **1.62** | **27.1** | 14.8 (clocked down) | 38 KB, 8 splits |
+Clean A/B (c-*), nothing else running, same build and the other current
+defaults:
 
-With nothing else running (m-cap, the new defaults): **60.0 fps, p99
-17.2 ms, 1.48 cores, 24.0 ms CPU a frame**, against 41.8 ms for the first build
-on the same grid. That's 41 % less CPU per frame, and no frame missed a vblank.
-Uncapped (m-unc, with Lavender back for part of it): 105.9 fps, 2.94 cores, GPU
-frame p50 7.5 ms. A full-throttle run with the new defaults renders the moving
-car and scenery correctly (k-throttle: 1.38 cores, 22.4 ms a frame).
+| Run | Change | frames/s | cores | CPU ms/frame |
+|---|---|---|---|---|
+| c-cap-clear | 60 cap, `clear_memory_page_state=true` | 61.3 | 1.54 | 25.1 |
+| c-cap | 60 cap, `clear_memory_page_state=false` | 60.4 | **1.27** | **21.0** |
+| c-unc-clear | uncapped, `clear_memory_page_state=true` | 105.0 | 2.43 | 23.2 |
+| c-unc | uncapped, `clear_memory_page_state=false` | **117.5** | 3.08 | 26.2 |
 
-The k-* rows: Lavender Shift was running alongside every one of these (4.6 cores and a
-third of the GPU when checked), so the frame rates are noisy. Upload volume
-and splits are not.
+At the 60 fps cap the change saves 16 % of the CPU. Uncapped it is 12 % more
+frames. Uploads fall from about 17 MB and 390 splits a frame to about 40 KB
+and 7 (k-* runs; upload volume isn't affected by other load). Against the
+first build on the same grid (41.8 ms with Lavender running, so only roughly
+comparable), the 60 fps grid now costs half the CPU per frame. A full-throttle
+run with the new defaults renders the moving car and scenery correctly.
 
 ### Shared memory the CPU writes (`vulkan_shared_memory_host_direct`)
 
@@ -161,9 +160,10 @@ rendering break. With the old 17 MB a frame it removed every upload-ended
 rendering (352 -> 0; the main target was begun 6 times a frame instead of 245)
 and GPU frame time fell from 15.3 to 11.9 ms under the profiler. Without the
 profiler it lost overall, because the GPU commands thread then pushed all
-17 MB over PCIe itself: about 2.8 ms more CPU a frame. With 40 KB a frame it
+17 MB over PCIe itself: roughly 2.8 ms more CPU a frame. With 40 KB a frame it
 measures the same as the copy path (k-unc-direct 92.7 fps, k-cap-direct
-26.8 ms), so it stays off. It is worth trying again on the UHD 620, where
+26.8 ms), so it stays off. Not cleanly measured: Lavender was running for all
+of these, and the 2.8 ms figure comes from a pair where it started mid-run. It is worth trying again on the UHD 620, where
 the memory is shared and a GPU copy is pure overhead. It gives up snapshot
 semantics: a draw already recorded in the same submission sees the new data.
 
@@ -199,8 +199,11 @@ blindvac is an ASUS X510UR: Core i5-8250U, Intel UHD 620 (driver
 route there over SSH. The game runs in session 0: Vulkan renders and the
 frame loop runs, but nothing is displayed. The build goes to `C:\cobalt\bin`
 with an app-local VC++ runtime, and the disc to `C:\cobalt\game\disc`. Vulkan
-lists the disabled NVIDIA 930MX first and the game hung on it, so the bench
-passes `--vulkan_device=0`.
+lists the disabled NVIDIA 930MX first and picks it by default. The one run on it
+(started in the interactive session) stopped logging during startup, so the
+bench passes `--vulkan_device=0` to use the UHD 620. Session 0 shows nothing,
+so these numbers don't include presentation, and nothing yet checks the
+UHD 620's image.
 
 | Run | Change | frames/s | cores | GPU ms/frame | notes |
 |---|---|---|---|---|---|
@@ -236,3 +239,32 @@ Cobalt now turns both on by default. The skip is the first part of
 the UHD 620 is still GPU-bound (32.8 ms), just past two 60 Hz vblanks. The
 rest of the pixel work is spread over many shaders: with flat pixel shaders
 the frame is 25 ms.
+
+### The UHD 620's own image
+
+Session 0 shows nothing, so the SDK gained `fh1_capture_output_frame` and
+`fh1_capture_output_path`: after that many swaps, the guest output (before
+presenter scaling) is written as a PPM. The frame replay (`fh1_frame_replay`
+on a dump from multivac) crashes in `memcpy` on the UHD 620, though it runs on
+the RTX 4080. Captures from live runs on the grid:
+
+- Defaults: `docs/images/uhd620-grid-default.png`. Correct.
+- `--cobalt_low_end=true`: `docs/images/uhd620-grid-low-end.png`. The grass
+  flowers are gone, and the two flags above the grandstand turn into black
+  shapes: `8FEC` also draws the flag cloth.
+
+The skipped draws, logged once (`fh1_skip_pixel_shaders`): alpha test off,
+**alpha to coverage on**, depth test and write on, opaque blend. With
+single-sampled host surfaces the SDK emulates alpha to coverage with a
+dithered `OpKill` in the shader. That and the depth write rule out early depth
+tests, so the UHD 620 shades every covered pixel. Hardware alpha to coverage
+(`alphaToCoverageEnable`, no kill in the shader) would fix the cause for every
+such draw on any GPU, instead of skipping one shader on one track.
+
+Anisotropic filtering: the SDK forces 4x (`anisotropic_override=3`). The
+game's own setting (-1) or off (0) saves about 7 % of the UHD 620's frame
+(76.5 -> 71.4 ms profiled). It doesn't change `8FEC`.
+
+The guest output in these captures has the HUD in the right place at the
+right size. The "UI scaled 1.25x from the top-left" seen in multivac's window
+screenshots is in presentation or window scaling, not in FM3's rendering.
