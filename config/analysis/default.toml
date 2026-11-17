@@ -19,7 +19,11 @@ direct_calls_bypass_thunk = true
 # app replaces with a strong `sub_` of its own must go through the weak thunk
 # instead, or the replacement only sees indirect calls.
 # 0x824AAA68: D3D's ring-space poll (src/ring_wait.cpp).
-host_overridden_functions = [0x824AAA68]
+# 0x827B5088, 0x827B4D30, 0x82592168, 0x827B4E40: the car shadow passes, and
+# 0x827FF238: the reflection cube faces, 0x827FDB88: the mirror, 0x828329C8:
+# a car's draw (src/render_rates.cpp).
+host_overridden_functions = [0x824AAA68, 0x827B5088, 0x827B4D30, 0x82592168, 0x827B4E40,
+                             0x827FF238, 0x827FDB88, 0x828329C8]
 fold_rodata_loads = true
 host_local_register_saves = true
 host_local_lr = true

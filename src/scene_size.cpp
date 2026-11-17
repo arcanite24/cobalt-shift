@@ -18,6 +18,8 @@
 #include <cstdio>
 #include <iterator>
 #include <string>
+#include <thread>
+#include <chrono>
 
 #include <fmt/format.h>
 
@@ -110,6 +112,22 @@ void ApplySceneSize() {
   auto* memory = state->memory();
   ResizeScene(memory);
   if (!REXCVAR_GET(cobalt_scene_probe)) return;
+  // The headers get their memory after the screen setup: log where each
+  // points every 30 s (the renderer is the static object at 0x82C232A8).
+  std::thread([memory] {
+    for (int round = 0; round < 20; ++round) {
+      std::this_thread::sleep_for(std::chrono::seconds(30));
+      std::string line;
+      for (uint32_t offset : {56u, 160u, 480u, 532u, 584u, 636u, 688u}) {
+        const auto* header = memory->TranslateVirtual<const uint32_t*>(0x82C232A8u + offset);
+        const uint32_t fetch1 = rex::byte_swap(header[8]), size = rex::byte_swap(header[9]);
+        line += fmt::format(" +{}={:08X}/{}x{}/pitch{}", offset, fetch1 & 0xFFFFF000u,
+                            (size & 0x1FFF) + 1, ((size >> 13) & 0x1FFF) + 1,
+                            ((rex::byte_swap(header[7]) >> 22) & 0x1FF) * 32);
+      }
+      REXLOG_INFO("[scene] header memory:{}", line);
+    }
+  }).detach();
   uint32_t logged = 0;
   bool page_readable = false;
   for (uint32_t address = 0x82000000; address < 0x83800000 && logged < 64; address += 4) {
