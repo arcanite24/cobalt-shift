@@ -268,3 +268,24 @@ game's own setting (-1) or off (0) saves about 7 % of the UHD 620's frame
 The guest output in these captures has the HUD in the right place at the
 right size. The "UI scaled 1.25x from the top-left" seen in multivac's window
 screenshots is in presentation or window scaling, not in FM3's rendering.
+
+### Alpha to coverage on the UHD 620: the cost is the foliage itself
+
+Three ways to make the alpha-to-coverage draws (cut-out grass, trees, fence
+crowds, flags) cheaper, measured unprofiled on the grid (defaults: 17.9 fps):
+
+| Run | fps | Image |
+|---|---|---|
+| `fh1_debug_alpha_to_mask_off=true` (draw them opaque) | 34.3 | broken: grass tufts as quads, black grid boxes, no fence crowd |
+| Pipeline alpha to coverage, shader kill not executed | 27.7 | broken, as above |
+| Pipeline alpha to coverage, no kill in the shader | 18.1 | cut-outs right, road corrupted (cyan streaks) |
+| Kill kept, no depth write for these draws | 16.7 | not captured |
+
+The 1x hardware path is no faster than the kill, and dropping depth writes
+gains nothing, so early depth tests are not what's missing. The cost is the
+overdraw itself: an opaque quad hides the layers behind it, a cut-out one
+doesn't, and every layer gets shaded. A correct image has to pay for that, so
+on this GPU the levers are drawing less foliage (the low-end preset skips
+`8FEC`, 30.5 fps) or shading fewer pixels. The hardware path and the
+depth-write option were not kept; `fh1_debug_alpha_to_mask_off` stays as a
+diagnostic.
