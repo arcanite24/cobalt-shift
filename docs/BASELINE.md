@@ -186,9 +186,12 @@ pattern: 43 % stack instructions and no `-O` on its generated units.
 
 ## Known rendering issues seen on the route
 
-- The 2D UI is scaled about 1.25x from the top-left corner. The Dolby splash
-  centre lands at (800, 450) instead of (640, 360), and dialogs and the race
-  HUD's lap times are clipped at the right edge. The 3D scene is fine.
+- ~~The 2D UI is scaled about 1.25x from the top-left corner.~~ Not FM3's:
+  `tools/window_shot.ps1` was DPI-unaware, so on multivac's 4K display at
+  125 % it captured the window's top-left 3072x1728 of 3840x2160, which looked
+  like a 1.25x UI clipped at the right. It now sets per-monitor DPI awareness
+  and captures the whole window. Screenshots in this file taken on multivac
+  before 2026-11-17 evening show that crop.
 - The car shadow, road and Montserrat scenery look right. Q18 and Q19 are not
   visible on this route.
 
