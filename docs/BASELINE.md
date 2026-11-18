@@ -995,3 +995,11 @@ reflections and mirror don't show at this noise (about ±10 % a round on
 blindvac, from occasional slow windows). On a static grid the chase camera
 doesn't show the mirror, and the shadow and reflection passes are cheaper than
 when the cars are spread out and moving, so the preset keeps them.
+
+In the moving race (`-Moving`, the race AI driving, 4 ABBA rounds) the
+season race is too short for more than one switch: three laps at Ladera end
+about 2.5 minutes in, and the rest of the run measured the results screen
+(exactly 30.0 fps). Only `cobalt_far_car_lod` got race windows: full detail
+was 5.2 % slower on average (rounds -20.7 to +6.2 %), the same direction as
+the grid's 8 %. Race-level A/Bs on blindvac need a longer event than the
+seed's next one; the frozen grid is the reliable comparison there.
