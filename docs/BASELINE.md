@@ -806,3 +806,18 @@ Also tried uncapped, both on together: `ppc_fixed_fp_mode` (#7, CB-4) and
 `latency_critical_thread_placement`: 216.4 fps against 234.8 (20 s windows;
 20 s windows on this route vary by up to about 12 %, so only large
 differences count). They stay off.
+
+## A race on a Disc 2 track (2026-11-18)
+
+The seed profile's title menu does have Free Play (FORZA MOTORSPORT 3 / FREE
+PLAY / Xbox LIVE MARKETPLACE; an earlier note here said otherwise). Free
+Play > Quick Race > Acura > RSX > assists OK lists Amalfi Coast first in
+Environment Select, with 2 tracks; FM3 read its database patches from
+`dlczips\amalfi_pri_65\media\db\patch\`. The fly-over and the race render
+correctly (8 cars, multivac, 60 fps cap). Pad timing for scripts: a 300 ms
+press on the title menu moved two rows, 120-150 ms moves one.
+
+No resolve of 1024x1024 or more happened in that race either (7 AI cars),
+so Quick Race cars carry no vinyls and the livery readback (#20) still has
+nothing to act on. Two 512x256 resolves were read back during the track load,
+once each.
