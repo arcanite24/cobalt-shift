@@ -629,3 +629,19 @@ FM3-ReGPU's VRAM upload ring does. Uncapped grid on multivac
 No difference beyond run-to-run noise: the grid is limited by the CPU
 (about 3.8 cores busy), not by the GPU reading constants over PCIe. On the
 UHD 620 all memory is already device-local. The switch stays off.
+
+## Disc 2 content in game (2026-11-17)
+
+With Disc 2 installed (`src/disc2_content.cpp`), FM3 lists the eight
+packages, opens them as `DLCRoot0`-`DLCRoot7` and no longer asks for the
+disc. Each package's `Media\DLCZips\zipmount.xml` names archives the game
+mounts as folders (package 0060: Amalfi, Fujimi Kaido and Nürburgring
+tracks; 0045: Nürburgring GP, the physics and test tracks, track images;
+the others string tables, engine and harmonic tuning, thumbnails). Hiding
+0060's `zipmount.xml` makes the boot log `FAILED: DLCRoot7:\media\dlczips\
+zipmount.xml`, so the game reads every mount list at boot; the archives
+themselves open on first use (hiding `FujimiKaido_pri_65.zip` logs nothing at
+boot). The only failed opens with everything in place are optional probes
+(`stringtables.xml` in three packages, `<id>_pri_65\media\db\patch\`).
+Not yet seen: a race on a Disc 2 track (the seeded profile's events are
+locked and Free Play wasn't reached by script).
