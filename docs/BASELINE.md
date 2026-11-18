@@ -557,6 +557,21 @@ a 4X surface, while the race tiles 2X as on multivac. The two runs above
 are with 4X tilings untiled and kept tiled (`fh1_untile_msaa_mask` 7 and
 2); the race doesn't differ.
 
+Low-end levers in the race on blindvac (one run each, against the two
+above):
+
+| Change | fps | frame p50 / p95 |
+|---|---|---|
+| `vulkan_shared_memory_host_direct` (uploads written by the CPU), two runs | 37.5, 38.4 | 31.5 / 33.8 ms |
+| scene at 800x450 | 41.3 | 18.9 / 33.6 ms |
+
+Writing uploads from the CPU removed few rendering breaks (113 -> 105 a
+frame) and gained nothing, so it stays off. MSAA was already single-sampled
+on the UHD 620. Shading in the 2X scene takes about 28 ms of the profiled
+41 ms of GPU time, spread over many shaders (the heaviest is 2.3 ms), so
+pixel count is the lever. `cobalt_low_end` now renders the scene at
+800x450 (`remote-450.png`: the whole HUD and the minimap).
+
 Ladera's road showed blocky bands over the asphalt and run-off
 (`bench-ladA.png`). Untiling, `spirv_implicit_lod_2d`,
 `spirv_fast_pixel_math` and the texture cache's packed-mip keys and

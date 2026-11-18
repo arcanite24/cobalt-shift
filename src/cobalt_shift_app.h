@@ -117,6 +117,9 @@ class CobaltShiftApp : public rex::ReXApp {
     // grid from 30.3 to 31.5 fps, with p95 frames from 34-48 to 33.9 ms.
     // The scene at 960x540 (src/scene_size.cpp, presenter upscale) took it
     // from 32.4 to 38.9-39.4 fps with the whole HUD (docs/BASELINE.md).
+    // In the Season Play race at Ladera, 800x450 ran 41.3 fps against
+    // 37.7-38.3 at 960x540, with the whole HUD; --cobalt_scene_size=960x540
+    // is sharper.
     if (REXCVAR_GET(cobalt_low_end)) {
       for (const auto& [name, value] :
            {std::pair{"fh1_skip_pixel_shaders", "8FEC358DC5728647"},
@@ -125,7 +128,7 @@ class CobaltShiftApp : public rex::ReXApp {
             std::pair{"cobalt_reflect_rate", "2"},
             std::pair{"cobalt_mirror_rate", "2"},
             std::pair{"cobalt_far_car_lod", "3"},
-            std::pair{"cobalt_scene_size", "960x540"}}) {
+            std::pair{"cobalt_scene_size", "800x450"}}) {
         if (rex::cvar::GetFlagSource(name) == rex::cvar::Source::kDefault) {
           rex::cvar::SetFlagByName(name, value);
         }
