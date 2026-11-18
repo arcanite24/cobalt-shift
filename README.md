@@ -25,3 +25,11 @@ python -I tools/cobalt_setup.py codegen
 Disc 2 is optional. With it, the first run installs its eight content packages (the extra cars
 and tracks, 3.4 GB) into `.local/game/content`, which every profile shares, and the game no
 longer asks for the disc. `--cobalt_disc2_content=false` hides them again.
+
+## Licence
+
+Only independently authored project files are licensed under the
+[BSD 3-Clause License](LICENSE). Microsoft, Xbox, Turn 10 Studios, *Forza Motorsport 3*, and
+third-party code and dependencies remain the property of their respective owners; the hooks
+ported from FM3-ReGPU keep its MIT licence ([Third-party notices](THIRD_PARTY_NOTICES.md)).
+Cobalt Shift is not affiliated with or endorsed by them.
