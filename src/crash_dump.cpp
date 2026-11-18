@@ -6,11 +6,8 @@
 // before. tools/read_dump.py reads the faulting thread from it. It is
 // installed at the first app hook, before the GPU device exists, writing next
 // to the executable until the user data folder is known.
-// --cobalt_crash_test=true checks it. A fault inside the NVIDIA driver on
-// blindvac never reached it, for a reason not found; Windows Error
-// Reporting's LocalDumps (a registry key per executable) caught that one, so
-// it is the collector for driver faults (docs/BASELINE.md, "The NVIDIA 930MX
-// on blindvac").
+// --cobalt_crash_test=true checks it. It caught the NVIDIA driver's fault on
+// blindvac at startup (docs/BASELINE.md, "The NVIDIA 930MX on blindvac").
 
 #include "crash_dump.h"
 

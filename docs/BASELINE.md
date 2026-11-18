@@ -1049,12 +1049,11 @@ of creating the swapchain, every time: c0000005 in `nvoglv64.dll`
 30.0.15.1169 (driver 511.69, January 2022) at offset 0x11824E0, a read of
 address 0.
 
-The in-process minidump (`src/crash_dump.cpp`) never fired for it, even
-installed before the GPU device existed (a deliberate crash,
-`--cobalt_crash_test=true`, does write one). Windows Error Reporting's
-LocalDumps did: `HKLM\SOFTWARE\Microsoft\Windows\Windows Error
-Reporting\LocalDumps\cobalt_shift.exe` (DumpFolder `C:\cobalt\werdumps`,
-DumpType 1, DumpCount 4), left set on blindvac for the next driver fault.
+The in-process minidump (`src/crash_dump.cpp`, installed at the first app
+hook) caught it: before the user data folder is known it writes next to the
+executable, `C:\cobalt\bin\crash-*.dmp`, which a broken remote listing first
+missed. Windows Error Reporting's LocalDumps, set on blindvac while looking,
+wrote the same fault and has been removed again.
 `tools/read_dump.py` against `rexruntime.map` put the faulting call in
 `VulkanPresenter::PaintAndPresentImpl`: the `vkCmdBeginRenderPass` of the
 swapchain pass on the first frame, where no guest image is drawn yet and the
@@ -1095,8 +1094,8 @@ low-end boots on the UHD 620 (`tools/boot_hunt_remote.ps1 -Extra
 benchmark run since has faulted (about 8). The hunt boots weren't the
 configuration of the two faulting runs, which were `bench_remote.ps1`
 season runs with `--perf_log_csv` and `--cobalt_ai_player=true` into the
-race, so this doesn't show the fault is gone. Its cause is unknown; WER
-LocalDumps on blindvac will keep a dump if it returns.
+race, so this doesn't show the fault is gone. Its cause is unknown; the
+in-process minidump will keep one if it returns.
 
 ## The low-end target in the race, six runs (2026-11-18)
 
@@ -1118,7 +1117,7 @@ the two runs that hit the Intel driver fault.
 Mean 46.0 fps (44.1-48.5), p99 at two vblanks (34 ms) in every run, and no
 frame over 100 ms. Under the cap a frame takes one or two 60 Hz vblanks, so
 the race alternates between 60 and 30 fps from moment to moment; about
-2.2 cores busy. All six got through and the WER dump folder stayed empty: the
+2.2 cores busy. All six got through with no dump written: the
 configuration of the two faults ran clean six times on today's build, and
 no run of any kind (about 26) has faulted since e7382ee. The cause is still unknown.
 

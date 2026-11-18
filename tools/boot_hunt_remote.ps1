@@ -4,10 +4,9 @@
 # Each run restores the season seed with a cold shader cache, starts the game
 # with --cobalt_low_end=true and -Extra, walks the title screens to the career
 # hub with the scripted pad, and checks at about 135 s whether it is still
-# running. A run that leaves a crash-*.dmp in the user folder stops the loop
-# and copies the dump and log to .local\dumps. Faults inside a GPU driver
-# don't reach the in-process dump; WER LocalDumps on the host writes those to
-# C:\cobalt\werdumps (docs/BASELINE.md, "The NVIDIA 930MX on blindvac").
+# running. A run that leaves a crash-*.dmp (in the user folder, or next to
+# the executable for a fault before that folder is known) stops the loop and
+# copies the dump and log to .local\dumps.
 #
 #   pwsh -File tools/boot_hunt_remote.ps1 -Runs 12 -Extra '--vulkan_device=0'
 param([int]$Runs = 12, [string]$Extra = '', [string]$Tag = 'hunt')
@@ -44,12 +43,14 @@ Set-Content -LiteralPath C:\cobalt\args.txt -Value @('$($args2 -join "','")')
     Remote 'Stop-Process -Name cobalt_shift -ErrorAction SilentlyContinue' | Out-Null
     Start-Sleep 3
     Stop-Process -Id $holder.Id -ErrorAction SilentlyContinue
-    $dumps = @(Remote "Get-ChildItem $user\crash-*.dmp -ErrorAction SilentlyContinue | ForEach-Object Name")
+    $dumps = @(Remote "Get-ChildItem $user\crash-*.dmp, C:\cobalt\bin\crash-*.dmp -ErrorAction SilentlyContinue | ForEach-Object FullName")
     $status = if ($died) { "exited at ${died}s" } else { 'alive' }
     "$Tag run ${r}: $status dumps: $($dumps -join ' ')"
     foreach ($d in $dumps) {
-        & scp -q -o BatchMode=yes "blindvac:C:/cobalt/user-hunt/$d" "$out\$d"
-        & scp -q -o BatchMode=yes 'blindvac:C:/cobalt/logs/hunt.log' "$out\$d.log"
+        $leaf = Split-Path -Leaf $d
+        & scp -q -o BatchMode=yes "blindvac:$($d -replace '\\', '/')" "$out\$leaf"
+        & scp -q -o BatchMode=yes 'blindvac:C:/cobalt/logs/hunt.log' "$out\$leaf.log"
+        Remote "Remove-Item -LiteralPath '$d'" | Out-Null
     }
     if ($dumps) { break }
 }
