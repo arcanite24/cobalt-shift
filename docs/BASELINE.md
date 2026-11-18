@@ -777,3 +777,18 @@ constant, so literal specialisation can't remove it. Done branchless with
 selects, blindvac's season race (cold caches, 30 s): 37.8 fps against 39.0
 with the switch, no gain; reverted. The signedness switch, the part
 specialisation could fold, is folded by `spirv_specialize_texture_signs`.
+
+## What #18's items would gain on blindvac (2026-11-18)
+
+In the Ladera race window (blindvac, 1,100 frames): guest memory uploads to
+the GPU average 224 KB a frame (median 37 KB), and write watching costs
+0.22 ms of CPU a frame. The GPU log puts EDRAM surfaces at 82 MB and textures
+at 458 MB of the 1.4 GB the iGPU holds. So:
+
+- vertex arena (CB-24): the vertex uploads it would save are a few KB a frame
+  here; its gain was at 1440p 4x;
+- zero-copy guest memory (CB-25): would save the 512 MB mirror (about 4 GB to
+  3.5 GB in all) but almost no frame time, and the SDK has no
+  `VK_EXT_external_memory_host` path; not worth the risk now;
+- idle surface release (CB-26): 82 MB of surfaces at 1280x720, against
+  14.3 GB at 4K 4x in FM3-ReGPU's measurement; nothing to win at this size.
