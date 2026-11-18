@@ -51,6 +51,14 @@ limit by default (`src/cobalt_shift_app.h`). A frame-time hook on FM3's main
 loop, as FM3-ReGPU's session 13 did, is how to keep 60 Hz and lose those
 misses.
 
+Update (2026-11-17, evening): the misses are gone. With the ring-space wait
+and the later front-end cuts, the first-run grid at the 60 fps cap measures
+60.0 fps, p99 17.17 ms, max 17.48 ms (`bench-d2off`): no frame takes two
+vblanks. FM3 takes its time step from the clock, so no frame-time hook is
+needed. The cap stays at 60 by default (the least work for low-end
+machines); `pinyon_shift_fh1_render_fps_limit=N` gives 2N fps, and above 120
+the front end stays at 120 (`cobalt_frontend_fps`, `src/frontend_rate.cpp`).
+
 ## Static grid route (from 2026-11-17)
 
 The throttle runs were not repeatable: mean draw calls were 1142, 1658 and
