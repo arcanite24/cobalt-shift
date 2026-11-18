@@ -57,7 +57,8 @@ class CobaltShiftApp : public rex::ReXApp {
     // spirv_specialize_texture_signs: each fetch's signedness becomes a
     // specialization constant, so the driver folds the per-fetch switch away
     // (the SDK has it on for mobile and macOS only). The UHD 620's Ladera race
-    // went from 29.8-31.1 to 37.5 fps; the RTX 4080's image is unchanged.
+    // went from 29.8-31.1 to 37.5 fps; the RTX 4080's image is unchanged. Set
+    // below, at the default cap only.
     //
     // FM3 runs its main loop once per guest vblank and takes its time step
     // from the millisecond clock (FM3-QUIRKS Q24), but the SDK fires vblanks
@@ -110,7 +111,6 @@ class CobaltShiftApp : public rex::ReXApp {
                                       std::pair{"clear_memory_page_state", "false"},
                                       std::pair{"spirv_implicit_lod_2d", "true"},
                                       std::pair{"spirv_fast_pixel_math", "true"},
-                                      std::pair{"spirv_specialize_texture_signs", "true"},
                                       std::pair{"fh1_untile_predicated_tiling", "true"},
                                       std::pair{"fh1_readback_resolve_sizes",
                                                 "32x512,512x256,256x128"},
@@ -166,6 +166,21 @@ class CobaltShiftApp : public rex::ReXApp {
       }
       if (render_limit > 30) {
         rex::cvar::SetFlagByName("gpu_record_thread", "true");
+      }
+    }
+    // Texture signs as specialization constants at the default cap (or
+    // low-end) only: they help a GPU-bound machine, but each draw then picks
+    // a pipeline variant, which costs a CPU-bound one (multivac uncapped:
+    // 293 -> 215 fps, 13.8 -> 18.5 ms CPU a frame).
+    if (rex::cvar::GetFlagSource("spirv_specialize_texture_signs") ==
+        rex::cvar::Source::kDefault) {
+      int render_limit = 30;
+      try {
+        render_limit = std::stoi(rex::cvar::GetFlagByName("pinyon_shift_fh1_render_fps_limit"));
+      } catch (...) {
+      }
+      if (REXCVAR_GET(cobalt_low_end) || (render_limit > 0 && render_limit <= 30)) {
+        rex::cvar::SetFlagByName("spirv_specialize_texture_signs", "true");
       }
     }
   }

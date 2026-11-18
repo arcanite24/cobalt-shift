@@ -792,3 +792,17 @@ at 458 MB of the 1.4 GB the iGPU holds. So:
   `VK_EXT_external_memory_host` path; not worth the risk now;
 - idle surface release (CB-26): 82 MB of surfaces at 1280x720, against
   14.3 GB at 4K 4x in FM3-ReGPU's measurement; nothing to win at this size.
+
+## Texture signs cost a CPU-bound machine (2026-11-18)
+
+multivac, season route, uncapped, 30 s windows: with
+`spirv_specialize_texture_signs` on, 214.8 fps and 18.5 ms CPU a frame;
+off, 293.1 fps and 13.8 ms (each draw picks a pipeline variant for its bound
+textures' signs). So Cobalt turns it on only at the default cap (render
+limit 30 or below) or with `cobalt_low_end`, where the GPU is the limit
+(blindvac 30 -> 37 fps), and leaves it off when the limit is raised.
+
+Also tried uncapped, both on together: `ppc_fixed_fp_mode` (#7, CB-4) and
+`latency_critical_thread_placement`: 216.4 fps against 234.8 (20 s windows;
+20 s windows on this route vary by up to about 12 %, so only large
+differences count). They stay off.
