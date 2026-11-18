@@ -89,7 +89,11 @@ try {
         $pad = @('A 200', 'wait 25000') + @(1..8 | ForEach-Object { 'A 200'; 'wait 9000' }) +
             @('START 200', 'wait 5000', 'A 200', 'wait 6000', 'A 100', 'wait 3000',
               'A 100', 'wait 800', 'A 100', 'wait 8000', 'A 100', 'wait 15000',
-              'A 100', 'wait 1500', 'A 100')               # as bench_race.ps1 -Route season
+              'A 100', 'wait 1500', 'A 100') +             # as bench_race.ps1 -Route season
+            # blindvac loads Ladera later than multivac: without these the
+            # last presses came during the load and the window measured the
+            # pre-race flyover.
+            @(1..8 | ForEach-Object { 'wait 8000'; 'A 100' })
         $padAt = 60
     }
     if ($Drive) { $pad += @('hold rt 1.0') }

@@ -84,7 +84,13 @@ class CobaltShiftApp : public rex::ReXApp {
     // road's detail image (FM3-QUIRKS Q18; stale, Ladera's asphalt showed
     // blocky bands, #25). When a car changes, its 512x256 picture and
     // 256x128 thumbnail, which it copies into the car's saved images.
-    // FM3-ReGPU writes the same ones back at once (src/gpu_host.cpp).
+    // FM3-ReGPU writes the same ones back at once (src/gpu_host.cpp). Each
+    // readback waits for the GPU, and Ladera renders its 128 strips again
+    // all race (one every other frame), which the CPU doesn't read: from
+    // 29.8 to 27 fps on the UHD 620. fh1_readback_resolve_quiet_frames reads
+    // an address back only after 600 frames without a resolve to it, so the
+    // load's burst is read and the race's re-renders (about every 256
+    // frames each) aren't.
     for (const auto& [name, value] : {std::pair{"pinyon_shift_fh1_render_fps_limit", "30"},
                                       std::pair{"gpu_read_pointer_publish_dwords", "1024"},
                                       std::pair{"clear_memory_page_state", "false"},
@@ -92,7 +98,8 @@ class CobaltShiftApp : public rex::ReXApp {
                                       std::pair{"spirv_fast_pixel_math", "true"},
                                       std::pair{"fh1_untile_predicated_tiling", "true"},
                                       std::pair{"fh1_readback_resolve_sizes",
-                                                "32x512,512x256,256x128"}}) {
+                                                "32x512,512x256,256x128"},
+                                      std::pair{"fh1_readback_resolve_quiet_frames", "600"}}) {
       if (rex::cvar::GetFlagSource(name) == rex::cvar::Source::kDefault) {
         rex::cvar::SetFlagByName(name, value);
       }

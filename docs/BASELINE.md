@@ -546,10 +546,16 @@ menu; and A is the title screen's button, not START.
 |---|---|---|---|---|
 | multivac, defaults (60 cap) | 60.0 | 17.1 ms | 1.20 | 2,285 |
 | multivac, uncapped | 268.7 | | 3.97 (14.8 ms CPU/frame) | |
-| blindvac, `cobalt_low_end`, vsync off | 29.8 | 34.0 ms | 0.98 | 1,419 |
+| blindvac, `cobalt_low_end`, vsync off, two runs | 37.7, 38.3 | 33.7 ms | 2.26, 2.30 | |
 
-blindvac is GPU-bound at Ladera: 33.3 ms of GPU a frame, so frames land on
-every other 60 Hz vblank, where the parked Montserrat grid ran 39-40 fps.
+The first blindvac numbers here (29.8 fps, 0.98 cores) measured the
+pre-race flyover, not the race. blindvac loads Ladera later than multivac,
+and the route's last A presses came during the load. The remote route now
+presses A eight more times, 8 s apart, and a capture of frame 11,500 shows
+the race with the whole 540p HUD (`remote-fix-m2.png`). The flyover tiles
+a 4X surface, while the race tiles 2X as on multivac. The two runs above
+are with 4X tilings untiled and kept tiled (`fh1_untile_msaa_mask` 7 and
+2); the race doesn't differ.
 
 Ladera's road showed blocky bands over the asphalt and run-off
 (`bench-ladA.png`). Untiling, `spirv_implicit_lod_2d`,
@@ -561,6 +567,15 @@ SDK kept those resolves on the GPU, so the CPU compressed stale memory.
 The SDK's `fh1_readback_resolve_sizes` now reads chosen color resolve
 sizes back to guest RAM before the next CPU-visible fence. Cobalt lists
 the strips and the car pictures (512x256, 256x128), as FM3-ReGPU does. The
-asphalt is right now (`bench-ladRB.png`), at a one-off cost at track load.
+asphalt is right now (`bench-ladRB.png`).
+
+Ladera renders its 128 strips again all race, one every other frame. Each
+readback makes the CPU wait for the GPU at the next fence, which cost
+blindvac's measurement 1-3 fps. The CPU doesn't read those re-renders: read
+back only once per address, the road stayed right. The SDK's
+`fh1_readback_resolve_quiet_frames` (Cobalt: 600) reads an address back only
+after 600 frames without a resolve to it. On multivac the load's burst was
+read back (229 readbacks) and nothing during the race, where each address
+is resolved again about every 256 frames.
 The start line's painted checks still have stair-stepped edges, which
 look like a point-sampled mask; that needs a console reference.
