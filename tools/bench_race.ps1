@@ -42,14 +42,17 @@ $csv = Join-Path $logs "bench-$Name.csv"
 Remove-Item -LiteralPath $csv -ErrorAction SilentlyContinue
 $python = Join-Path $root '.local/toolchain/python-3.13.15/python.exe'
 $userRoot = Join-Path $root '.local/user'
-$routeArguments = @('--cobalt_disc2_content=false')   # keeps the Disc 2 prompt the route answers
+$routeArguments = @()
+if ($Route -eq 'first-run') {
+    $routeArguments += '--cobalt_disc2_content=false'   # keeps the Disc 2 prompt the route answers
+}
 if ($Route -eq 'season') {
     if (-not $Seed) { $Seed = Join-Path $root '.local/seeds/after-first-race' }
     if (-not (Test-Path -LiteralPath $Seed)) { throw "No seed profile: $Seed" }
     $userRoot = Join-Path $root '.local/user-season'
     Remove-Item -LiteralPath $userRoot -Recurse -Force -ErrorAction SilentlyContinue
     Copy-Item -LiteralPath $Seed -Destination $userRoot -Recurse
-    $routeArguments += '--cobalt_ai_player=true'
+    $routeArguments = @('--cobalt_ai_player=true')
     if (-not $PSBoundParameters.ContainsKey('RaceWait')) { $RaceWait = 240 }
 }
 $pad = Join-Path $userRoot 'pad.txt'

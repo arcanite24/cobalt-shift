@@ -4,8 +4,11 @@ Cobalt Shift ports a few guest hooks from FM3-ReGPU
 (https://github.com/braaap-stututu/FM3-ReGPU): `src/ring_wait.cpp` (the
 ring-space poll), `src/render_rates.cpp` (car shadow, reflection and
 mirror rates, distant car detail) and `src/ai_player.cpp` (the race AI
-driving the player's car). Their notes and addresses come from its
-`src/hooks`; the code here is our own on ShiftGlue. Its licence:
+driving the player's car), `src/frontend_rate.cpp` (the front end's
+frame limit) and `src/disc2_content.cpp` (Disc 2's database patches).
+Their notes and addresses come from its `src/hooks`; the code there is our
+own on ShiftGlue. `src/lzx.cpp` and `src/lzx.h` (the Xbox LZX decoder) are
+its `src/lzx.*` with a header line added. Its licence:
 
 ```
 MIT License

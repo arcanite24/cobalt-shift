@@ -53,7 +53,9 @@ function Save-Shot([string]$Path) {
 # blindvac's NVIDIA 930MX is disabled for Windows, but Vulkan still lists it
 # and picks it by default (the game hung there); the UHD 620 is device 0.
 $arguments = @('--perf_log_csv=C:\cobalt\logs\bench.csv', '--log_file=C:\cobalt\logs\bench.log',
-    '--vulkan_device=0', '--cobalt_disc2_content=false') + $GameArguments
+    '--vulkan_device=0') + $GameArguments
+# The first-run route answers the Disc 2 prompt, which installed content removes.
+if ($Route -ne 'season') { $arguments += '--cobalt_disc2_content=false' }
 # The user data folder C:\cobalt\launch.ps1 (tools/remote/launch.ps1) uses.
 $user = 'C:\cobalt\user'
 $userSetup = 'Remove-Item C:\cobalt\user_root.txt -ErrorAction SilentlyContinue'

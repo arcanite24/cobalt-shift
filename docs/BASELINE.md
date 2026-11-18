@@ -643,5 +643,28 @@ zipmount.xml`, so the game reads every mount list at boot; the archives
 themselves open on first use (hiding `FujimiKaido_pri_65.zip` logs nothing at
 boot). The only failed opens with everything in place are optional probes
 (`stringtables.xml` in three packages, `<id>_pri_65\media\db\patch\`).
+The `<id>_pri_65\media\db\patch\` failures were not optional: those
+folders are where FM3 looks for each package's database patches
+(`*_merge.slt`, `*_execute.sql`: the DLC cars' and Disc 2 tracks' rows, and
+`IsInstalled=1` for them), which ship only inside `<id>_pri_65.zip`. Cobalt
+now unpacks them next to each zip once (15 files, stored or Xbox LZX), as
+FM3-ReGPU does (its session 18; found by the FM2 port). With them in place
+those opens succeed; the remaining `...\media\db\patch\` probes are for
+the other archives, which have none.
+
+A Season Play race at Ladera with Disc 2 on (patches applied) against off,
+multivac, 60 fps cap, 30 s:
+
+| Run | fps | p99 | cores | CPU per frame |
+|---|---|---|---|---|
+| Disc 2 on | 60.0 | 17.15 ms | 1.92 | 31.5 ms |
+| Disc 2 off | 60.0 | 17.12 ms | 1.11 | 18.3 ms |
+| Disc 2 on, again | 60.0 | 17.16 ms | 1.06 | 17.4 ms |
+
+The first run's extra CPU was the main guest thread (822BDE68) at a full
+core; it didn't repeat (0.23-0.29 in two later runs, mostly waiting when
+sampled). Disc 2 costs nothing in a race. A busy main thread now and then is
+worth watching for on any route.
+
 Not yet seen: a race on a Disc 2 track (the seeded profile's events are
-locked and Free Play wasn't reached by script).
+locked and its menus have no Free Play).
