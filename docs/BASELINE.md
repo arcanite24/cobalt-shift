@@ -697,3 +697,22 @@ a cold start. `-KeepCache` keeps the previous run's shader and pipeline caches.
   it: about 4 GB in a race, which fits an 8 GB machine. The 1.4 GB of GPU
   memory is the target for idle surface release (#18); its 14.3 -> 5.7 GB gain
   was measured at 4K, and blindvac renders at 1280x720.
+
+## MS volatile off, same codegen, ring wait on (#6, 2026-11-17)
+
+Same generated code and sources, two build folders: `win-amd64-release`
+(`-fno-ms-volatile` and compiler barriers for the PPC barriers, the default)
+and one configured with `-DCOBALT_SHIFT_MS_VOLATILE=ON`. multivac, season
+route at Ladera, uncapped, the ring wait on (1000 us, the default), 60 s
+windows, alternated A B A B.
+
+| build | fps | process cores | CPU per frame |
+|---|---|---|---|
+| `-fno-ms-volatile` (default) | 220.9, 224.8 | 3.91, 3.91 | 17.71, 17.39 ms |
+| MS volatile | 224.0, 220.2 | 4.09, 4.11 | 18.26, 18.66 ms |
+
+Frame rate is the same within noise (the uncapped race is limited elsewhere),
+but MS volatile costs about 5 % more CPU per frame (18.46 against 17.55 ms
+mean). That CPU is free headroom on a slower machine. `-fno-ms-volatile`
+stays the default. ReXenon-style relaxed atomic loads and stores (step 3)
+are still to try.
