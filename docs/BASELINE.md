@@ -1121,3 +1121,15 @@ the race alternates between 60 and 30 fps from moment to moment; about
 2.2 cores busy. All six got through and the WER dump folder stayed empty: the
 configuration of the two faults ran clean six times on today's build, and
 no run of any kind (about 26) has faulted since e7382ee. The cause is still unknown.
+
+## The low-end preset at 4K (multivac, 2026-11-18)
+
+`tools/bench_race.ps1 -Seconds 30` (the Montserrat grid),
+`--cobalt_low_end=true --draw_resolution_scale_x=3
+--draw_resolution_scale_y=3`, default cap, RTX 4080: a 3840x2160 swapchain,
+the scene at 800x450 times 3 (2400x1350, `[scene] tiling bands scaled to
+800x450`) and the HUD at full size; the screenshot shows the whole race scene
+and HUD. 60.0 fps, p50 16.65 ms, p99 17.15, max 17.42, no frame over 20 ms,
+1.12 cores, 1.9 GB resident. The preset works at 4K output and holds the
+cap with nothing to spare on any frame; on this machine it isn't needed
+(the full-detail 4K grid runs 199-201 fps uncapped).
