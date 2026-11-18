@@ -962,14 +962,17 @@ validation layer to see the call that faults. The build now writes a
 minidump on a crash (`src/crash_dump.cpp`, `cobalt_crash_dump`, on by
 default) to the user data folder, and `tools/read_dump.py` reads the faulting
 thread against the linker maps. Five more low-end runs with it (2026-11-18)
-got through, so the fault stands at 2 in 13 runs and no dump yet.
+got through, and no dump yet.
 
-A blindvac check of the paint editor wasn't done: its screenshots show the
-desktop, so the menus would have to be driven blind, and the scripted title
-sequence doesn't reach the career hub reliably. The fix it would check (#20,
-an iterator used after the `push_back` that invalidated it) is plain CPU
-code, and the driver path it uses (resolve readbacks) already runs in every
-blindvac race.
+The paint editor on blindvac, driven blind by `tools/paint_remote.ps1`
+(2026-11-18): the season seed to the career hub, PAINT > APPLY DECALS, the
+tips dismissed, START > save to the current car. Its log shows what multivac's
+did: the editor's 2048x2048 target (0EDBC000) declared and read back, then
+"rendered again: not read back"; after the save, the car's picture
+(176E4000+80000, 512x256) and thumbnail (17764000+20000, 256x128) read back.
+No crash, the game still running at the end. That run and the uncapped
+low-end A/B below also got through, so the driver fault stands at 2 in 15
+runs.
 
 ## The low-end cuts on blindvac's frozen grid (2026-11-18)
 
@@ -1003,3 +1006,13 @@ about 2.5 minutes in, and the rest of the run measured the results screen
 was 5.2 % slower on average (rounds -20.7 to +6.2 %), the same direction as
 the grid's 8 %. Race-level A/Bs on blindvac need a longer event than the
 seed's next one; the frozen grid is the reliable comparison there.
+
+Uncapped (`--pinyon_shift_fh1_render_fps_limit=180 --host_present_fps_limit=0
+--vsync=false`), the same A/Bs were noisier, not cleaner: the null switch
+ranged from -17.5 to +16.7 % a round, and the grid ran 27-31 fps against 38-43
+at the default cap. A 360 Hz guest vblank makes FM3 run its main loop far more
+often than it draws; a likely cause (not measured) is that the UHD 620 shares
+its power budget with the CPU, so the extra CPU work slows the GPU. No switch agreed across rounds:
+`cobalt_shadow_rate` 2/1 +5.8 %, `cobalt_reflect_rate` 2/1 +0.7 %,
+`cobalt_far_car_lod` 3/0 -6.2 % (the same direction as capped). On an iGPU,
+the default cap is both the faster setup and the better place to measure.
