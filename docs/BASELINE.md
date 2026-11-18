@@ -999,6 +999,14 @@ blindvac, from occasional slow windows). On a static grid the chase camera
 doesn't show the mirror, and the shadow and reflection passes are cheaper than
 when the cars are spread out and moving, so the preset keeps them.
 
+All three together (`-Switch cobalt_shadow_rate+cobalt_reflect_rate+cobalt_mirror_rate=2/1`,
+8 ABBA rounds, the same capped setup): full rate was 2.1 % slower on average,
+slower in 6 of 8 rounds, median -2.5 %; the null switch in the same run
+averaged +1.7 % with a median of +0.3 %. So the half-rate passes save about
+2 % of the grid's frame between them, close to the noise but in the expected
+direction, and about what FM3-ReGPU reported for its four cuts (30.3 -> 31.5
+fps, most of it the far-car LOD).
+
 In the moving race (`-Moving`, the race AI driving, 4 ABBA rounds) the
 season race is too short for more than one switch: three laps at Ladera end
 about 2.5 minutes in, and the rest of the run measured the results screen

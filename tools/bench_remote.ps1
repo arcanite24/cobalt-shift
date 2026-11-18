@@ -23,7 +23,8 @@ param(
     # (user-season\cache), so the race measures a warm start, not a cold one.
     [switch]$KeepCache,
     # With -Route season: freeze the grid and A/B these live switches,
-    # "cvar=off/on" each, in ABBA rounds as bench_ab.ps1 does (instead of the
+    # "cvar=off/on" each ("a+b=off/on" switches several together), in ABBA
+    # rounds as bench_ab.ps1 does (instead of the
     # -Seconds window). -Rounds pairs of -Window-second windows per switch.
     [string[]]$Switch = @(),
     [int]$Rounds = 6,
@@ -145,13 +146,15 @@ function Sample { `$a = Rows; Start-Sleep -Seconds $Window; "`${a}:`$(Rows)" }
 SetLive ''; `$null = Sample
 foreach (`$spec in @('$($specs -join "','")')) {
     `$cvar, `$values = `$spec -split '='; `$off, `$on = `$values -split '/'
+    `$cvars = `$cvar -split '[+]'
     for (`$r = 0; `$r -lt $Rounds; `$r++) {
         foreach (`$side in `$(if (`$r % 2) { 'on', 'off' } else { 'off', 'on' })) {
-            SetLive ("`$cvar " + `$(if (`$side -eq 'on') { `$on } else { `$off }))
+            `$value = if (`$side -eq 'on') { `$on } else { `$off }
+            SetLive @(`$cvars | ForEach-Object { "`$_ `$value" })
             "ab `$spec `$side `$(Sample)"
         }
     }
-    SetLive "`$cvar `$off"
+    SetLive @(`$cvars | ForEach-Object { "`$_ `$off" })
 }
 "@
         $abLines = @($abLines | Where-Object { $_ -like 'ab *' })
