@@ -24,8 +24,9 @@ param(
 # season), stops the world on the start grid at the countdown's "1"
 # (--cobalt_freeze_grid_at=9, src/frozen_grid.cpp), then switches each -Switch
 # between its two values through the live file (--cobalt_live_file),
-# interleaved, -Rounds times. Every frame draws the same scene, so the sides
-# differ by the switch alone. A warm-up window is measured and dropped first.
+# interleaved, -Rounds times. The frozen scene holds steady (draw calls per
+# frame within ±0.7 %), so the sides differ by the switch alone. A warm-up
+# window is measured and dropped first.
 # Each window counts as its median frame time (tools/ab_windows.py), so the
 # odd slow frame does not move it.
 # Screenshots of each switch's first round go to ab-<Name>-<cvar>-off.png and

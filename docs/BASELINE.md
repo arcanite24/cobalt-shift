@@ -878,22 +878,28 @@ renders FM3 without game hooks.
 
 ## blindvac's occasional long race frames (2026-11-18)
 
-The Ladera race windows on blindvac show 0-3 frames of 150-280 ms in 40 s
-(for example rows 10310, 10589 and 11263 of `remote-blindvac-cube-true.csv`,
-which were 150, 151 and 183 ms). Their counters:
+Over 24 season-route captures on blindvac (Ladera, 10-80 s windows), 11 had
+at least one frame over 100 ms in the measured window, usually one or two.
+They are about 0.1 % of frames and don't move the averages. They come in two
+kinds:
 
-- the GPU's own time for the frame (`guest_frame_gpu_time_ns`) was 25-30 ms,
-  as usual;
-- the command thread waited 120-160 ms on a fence
-  (`gpu_thread_fence_wait_ns`), and submission was busy 160-200 ms;
-- no pipeline cache misses, no readbacks, and uploads of 50-370 KB.
+- **Normal GPU time, long fence wait** (most of them): for example 183 ms with
+  `guest_frame_gpu_time_ns` 25 ms and `gpu_thread_fence_wait_ns` 159 ms
+  (`cube-true`), or 483 ms with 22 and 458 (`lad-fix-m2`). The GPU's work
+  took as long as usual and the command thread waited for its fence.
+- **Long GPU time**: the 282 ms frame of the relaxed-atomics run (GPU 281 ms,
+  fence wait 258), and 133-152 ms frames with GPU times of 160-231 ms
+  (`lad-fix-m2`, `lad-hd1`). The GPU counter runs timestamp to timestamp, so it
+  includes a gap where the GPU sat waiting for a submission. These don't show
+  that the GPU worked longer.
 
-So no game or renderer work is behind them: the GPU finished on time and
-the wait is for the driver to signal it. They don't recur at a fixed period.
-The cause is most likely the Intel driver or Windows on that laptop, outside
-our control; at about 0.1 % of frames they don't move the averages. The
-load frames (1-3 s while a track streams in, 70-80 MB of uploads) are a
-separate matter and happen before the green light.
+None of these frames had a pipeline cache miss or a readback, and their
+uploads were small (50-370 KB). They don't recur at a fixed time or period,
+and windows of the same build differ (the cold and warm 60 s runs had none).
+**Hypothesis, not tested:** the Intel driver or Windows on that laptop holds a
+submission or its fence now and then. Checking it would take a driver-level
+trace (GPUView or PresentMon) on blindvac. The load frames before the green
+light (1-3 s, 70-80 MB of uploads) are a separate matter.
 
 ## Frozen grid and live A/B switches (#5, CB-0.5, 2026-11-18)
 
@@ -905,6 +911,7 @@ setting the main loop's frame time to 0 (sub_821F6AF8's return to
 drawn. `--cobalt_freeze_time` freezes or releases the world anywhere. With
 `--cobalt_live_file=<path>`, lines `<cvar> <value>` written to that file are
 applied within half a second, which works for any cvar that reloads live.
+On the frozen grid a frame has 2,488-2,523 draw calls (median 2,502).
 
 `tools/bench_ab.ps1 -Name x -Uncapped -Switch cvar=off/on,...` boots the
 season route into the frozen grid, drops a warm-up window, then measures each
@@ -933,3 +940,8 @@ So the noise floor here is about ±2.5 % for a round and about ±1 % for the
 desktop in use and this scene is CPU-bound. The rates were chosen for the
 UHD 620, where the GPU is the limit; on multivac only the far-car LOD
 reduces CPU work enough to show.
+
+The build with the frozen-grid hooks (e7382ee) on blindvac, season route, 25 s
+window: 38.0 frames a second (p50 31.8 ms), no frame over 100 ms, working set
+2,555 MB. The race start was logged and GO came at 9.5 s; without
+`--cobalt_freeze_grid_at` the hooks only log.
