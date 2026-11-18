@@ -128,6 +128,19 @@ option(COBALT_SHIFT_MS_VOLATILE
     "Compile the generated units with MSVC volatile semantics (clang's Windows default)" OFF)
 if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT MSVC AND NOT COBALT_SHIFT_MS_VOLATILE)
     list(APPEND REXGLUE_RECOMP_OPTIONS -fno-ms-volatile -DREX_PPC_COMPILER_BARRIERS)
+    # CB-1 step 3: relaxed atomic guest accesses (docs/BASELINE.md).
+    option(COBALT_SHIFT_RELAXED_GUEST_ACCESS
+        "Guest loads and stores as relaxed atomics instead of volatile accesses" ON)
+    if(COBALT_SHIFT_RELAXED_GUEST_ACCESS)
+        list(APPEND REXGLUE_RECOMP_OPTIONS -DREX_RELAXED_GUEST_ACCESS)
+    endif()
+endif()
+# Extra flags for the generated units only, for A/B builds in a second folder.
+set(COBALT_SHIFT_RECOMP_EXTRA_FLAGS "" CACHE STRING
+    "Extra compiler flags for the generated units (A/B builds)")
+if(COBALT_SHIFT_RECOMP_EXTRA_FLAGS)
+    separate_arguments(_cobalt_extra NATIVE_COMMAND "${COBALT_SHIFT_RECOMP_EXTRA_FLAGS}")
+    list(APPEND REXGLUE_RECOMP_OPTIONS ${_cobalt_extra})
 endif()
 if(WIN32 AND LAVENDER_RECOMP_SEH)
     if(MSVC)

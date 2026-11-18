@@ -716,3 +716,21 @@ but MS volatile costs about 5 % more CPU per frame (18.46 against 17.55 ms
 mean). That CPU is free headroom on a slower machine. `-fno-ms-volatile`
 stays the default. ReXenon-style relaxed atomic loads and stores (step 3)
 are still to try.
+
+## Relaxed atomic guest accesses (#6 step 3, 2026-11-17)
+
+`REX_RELAXED_GUEST_ACCESS` (ShiftGlue's codegen PCH; on by default through
+`COBALT_SHIFT_RELAXED_GUEST_ACCESS` with `-fno-ms-volatile`): guest loads and
+stores become relaxed `__atomic_load_n`/`__atomic_store_n` instead of
+volatile accesses, as ReXenon did. multivac, season route, uncapped, one A/B
+pass of 30 s windows, same codegen otherwise:
+
+| build | fps | process cores | CPU per frame |
+|---|---|---|---|
+| volatile (`-fno-ms-volatile`) | 254.5 | 4.04 | 15.89 ms |
+| relaxed atomics | 269.1 | 4.00 | 14.87 ms |
+
++5.7 % fps and 6.4 % less CPU per frame, on top of the 5 % from
+`-fno-ms-volatile` (run-to-run noise on this route was about 2 %). The first
+run and season routes both play at 60 fps capped, with no frame over 20 ms in
+their windows.

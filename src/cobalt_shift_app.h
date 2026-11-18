@@ -92,6 +92,14 @@ class CobaltShiftApp : public rex::ReXApp {
     // an address back only after 600 frames without a resolve to it, so the
     // load's burst is read and the race's re-renders (about every 256
     // frames each) aren't.
+    //
+    // fh1_readback_enclosing_sizes: a car's livery (2048x2048 for close-ups,
+    // 1024x1024 for racing, 8888), built on the GPU when a car with vinyls
+    // loads, then compressed to DXT by the CPU from memory. Its strips and
+    // vinyl regions are resolved into tile positions inside the image, so
+    // the image's own resolve declares its range and every resolve into it is
+    // read back too (FM3-ReGPU's livery writeback, issue B2). An image of
+    // those sizes rendered again every frame is a render target, skipped.
     for (const auto& [name, value] : {std::pair{"pinyon_shift_fh1_render_fps_limit", "30"},
                                       std::pair{"gpu_read_pointer_publish_dwords", "1024"},
                                       std::pair{"clear_memory_page_state", "false"},
@@ -100,7 +108,9 @@ class CobaltShiftApp : public rex::ReXApp {
                                       std::pair{"fh1_untile_predicated_tiling", "true"},
                                       std::pair{"fh1_readback_resolve_sizes",
                                                 "32x512,512x256,256x128"},
-                                      std::pair{"fh1_readback_resolve_quiet_frames", "600"}}) {
+                                      std::pair{"fh1_readback_resolve_quiet_frames", "600"},
+                                      std::pair{"fh1_readback_enclosing_sizes",
+                                                "2048x2048,1024x1024"}}) {
       if (rex::cvar::GetFlagSource(name) == rex::cvar::Source::kDefault) {
         rex::cvar::SetFlagByName(name, value);
       }
