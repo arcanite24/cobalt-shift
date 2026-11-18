@@ -760,3 +760,9 @@ Ladera, 30 s windows:
 About +20 % on the iGPU, and the long frames go away with the caches warm.
 multivac's image (RTX 4080, season race) is unchanged; capped at 60 fps the
 cold run had one 67 ms frame while the variants were built.
+
+The SDK's other mobile-only switches, all three together on top
+(`spirv_ieee_vertex_math`, `vulkan_bindless_textures`,
+`vulkan_shared_memory_texel_buffer`), warm caches: 37.8 fps against 37.0,
+within noise. They stay off (IEEE vertex math also turns 0 * Inf vertices
+into NaN).
