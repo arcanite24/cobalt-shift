@@ -742,3 +742,21 @@ had one 282 ms frame, all of it GPU time (`guest_frame_gpu_time_ns` 280 ms,
 the fence wait 258 ms) with nothing logged at that moment: no pipeline build,
 no readback. The cold and warm runs before had none in 60 s windows. Watch for
 it in later blindvac runs.
+
+## Texture signs as specialization constants on (#15, 2026-11-17)
+
+`spirv_specialize_texture_signs` (ShiftGlue, on by default only for mobile
+GPUs and macOS) makes each texture fetch's signedness a specialization
+constant set from the bound textures, so the driver folds the per-fetch
+switch away. Cobalt now turns it on. blindvac (UHD 620), season route at
+Ladera, 30 s windows:
+
+| run | fps | p50 | frames > 50 ms |
+|---|---|---|---|
+| off: cold, warm, relaxed build (60, 60, 30 s windows) | 30.1, 29.8, 31.1 | 33.3 ms | 31, 35, 12 |
+| on, cold caches (cvar) | 37.5 | 31.2 ms | 3 (3 over 100 ms: variants being built) |
+| on, the Cobalt default, warm caches | 37.0 | 32.0 ms | 0 |
+
+About +20 % on the iGPU, and the long frames go away with the caches warm.
+multivac's image (RTX 4080, season race) is unchanged; capped at 60 fps the
+cold run had one 67 ms frame while the variants were built.

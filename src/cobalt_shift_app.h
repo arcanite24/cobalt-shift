@@ -54,6 +54,11 @@ class CobaltShiftApp : public rex::ReXApp {
     // spirv_implicit_lod_2d and spirv_fast_pixel_math: the UHD 620's grid went
     // from 14.7 to 17.9 fps with both, and the RTX 4080's image looks the same.
     //
+    // spirv_specialize_texture_signs: each fetch's signedness becomes a
+    // specialization constant, so the driver folds the per-fetch switch away
+    // (the SDK has it on for mobile and macOS only). The UHD 620's Ladera race
+    // went from 29.8-31.1 to 37.5 fps; the RTX 4080's image is unchanged.
+    //
     // FM3 runs its main loop once per guest vblank and takes its time step
     // from the millisecond clock (FM3-QUIRKS Q24), but the SDK fires vblanks
     // at twice the render limit for FH1, which waits for two. At 120 Hz FM3
@@ -105,6 +110,7 @@ class CobaltShiftApp : public rex::ReXApp {
                                       std::pair{"clear_memory_page_state", "false"},
                                       std::pair{"spirv_implicit_lod_2d", "true"},
                                       std::pair{"spirv_fast_pixel_math", "true"},
+                                      std::pair{"spirv_specialize_texture_signs", "true"},
                                       std::pair{"fh1_untile_predicated_tiling", "true"},
                                       std::pair{"fh1_readback_resolve_sizes",
                                                 "32x512,512x256,256x128"},
