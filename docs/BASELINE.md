@@ -594,3 +594,10 @@ read back (229 readbacks) and nothing during the race, where each address
 is resolved again about every 256 frames.
 The start line's painted checks still have stair-stepped edges, which
 look like a point-sampled mask; that needs a console reference.
+
+The log's `PM4_DRAW_INDX_2 ... Failed in backend (edram_mode=6)` errors,
+one to three a frame, were resolves the SDK skipped: FM3 resolves a 16_16
+color target into a 16_16 texture (`c4->t25`, 1X and 4X), and the executor
+had no 16_16 destination. The resolve shader now writes one (pack 7: the
+target's snorm words, the samples averaged), and a Ladera run logs no
+skipped resolves and no draw failures.
