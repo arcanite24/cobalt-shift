@@ -1004,8 +1004,7 @@ All three together (`-Switch cobalt_shadow_rate+cobalt_reflect_rate+cobalt_mirro
 slower in 6 of 8 rounds, median -2.5 %; the null switch in the same run
 averaged +1.7 % with a median of +0.3 %. So the half-rate passes save about
 2 % of the grid's frame between them, close to the noise but in the expected
-direction, and about what FM3-ReGPU reported for its four cuts (30.3 -> 31.5
-fps, most of it the far-car LOD).
+direction.
 
 In the moving race (`-Moving`, the race AI driving, 4 ABBA rounds) the
 season race is too short for more than one switch: three laps at Ladera end
