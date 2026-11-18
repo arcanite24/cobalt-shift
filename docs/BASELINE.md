@@ -821,3 +821,22 @@ No resolve of 1024x1024 or more happened in that race either (7 AI cars),
 so Quick Race cars carry no vinyls and the livery readback (#20) still has
 nothing to act on. Two 512x256 resolves were read back during the track load,
 once each.
+
+## Liveries and car pictures read back (#20, 2026-11-18)
+
+Career > PAINT > APPLY DECALS, with a vinyl added and saved (multivac, the
+after-first-race seed). The editor's first 2048x2048 image (0EDAC000) was
+declared by its own resolve and read back, then marked "rendered again: not
+read back" once it was resolved every frame: it's the editor's render target.
+The images the save builds (2048x2048 at 1036B000 and 1136B000) were declared
+and read back, and the vinyl rectangle shows on the car after saving. Right
+after the save the car's picture and thumbnail were read back: 17704000+80000
+(512x256) and 1766D000+20000 (256x128).
+
+Other 2048-wide destinations appear during the build (2048x1536, 1024, 1632,
+1824, 1376). They aren't in the sizes list, and none falls inside a declared
+range, so they stay on the GPU; the saved livery looks right without them.
+
+Entering APPLY DECALS crashed (c0000005 in rexgpu-fh1.dll, in
+IsReadbackEnclosed): an iterator was used after the `push_back` that
+invalidated it. Fixed in the SDK (76f9d72a).
