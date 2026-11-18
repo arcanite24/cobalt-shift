@@ -641,8 +641,8 @@ the others string tables, engine and harmonic tuning, thumbnails). Hiding
 0060's `zipmount.xml` makes the boot log `FAILED: DLCRoot7:\media\dlczips\
 zipmount.xml`, so the game reads every mount list at boot; the archives
 themselves open on first use (hiding `FujimiKaido_pri_65.zip` logs nothing at
-boot). The only failed opens with everything in place are optional probes
-(`stringtables.xml` in three packages, `<id>_pri_65\media\db\patch\`).
+boot). With everything in place the failed opens were `stringtables.xml` in
+three packages (an optional probe) and `<id>_pri_65mediadbpatch`.
 The `<id>_pri_65\media\db\patch\` failures were not optional: those
 folders are where FM3 looks for each package's database patches
 (`*_merge.slt`, `*_execute.sql`: the DLC cars' and Disc 2 tracks' rows, and
