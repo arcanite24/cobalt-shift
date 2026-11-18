@@ -206,7 +206,8 @@ pattern: 43 % stack instructions and no `-O` on its generated units.
 ## Low-end: blindvac (Intel UHD 620)
 
 blindvac is an ASUS X510UR: Core i5-8250U, Intel UHD 620 (driver
-31.0.101.2140), Windows 11. `tools/bench_remote.ps1` runs the same grid
+31.0.101.2140 for the measurements below until 2026-11-18, 31.0.101.2145
+since), Windows 11. `tools/bench_remote.ps1` runs the same grid
 route there over SSH. The game runs in session 0: Vulkan renders and the
 frame loop runs, but nothing is displayed. The build goes to `C:\cobalt\bin`
 with an app-local VC++ runtime, and the disc to `C:\cobalt\game\disc`. Vulkan
@@ -957,9 +958,10 @@ through. In a surviving run that moment (frames 3,000-3,600) is where the
 first 3D scene starts: native surfaces go from 4 to 11 and 27 shaders are
 seen for the first time. So the fault is most likely in the driver's pipeline
 or first-scene setup. It doesn't occur on multivac. The driver DLL is dated November 2025 (Gen9
-GPUs such as the UHD 620 are on Intel's legacy branch), so a newer driver may
-not exist; the next step if it keeps happening is a run with the Vulkan
-validation layer to see the call that faults. The build now writes a
+GPUs such as the UHD 620 are on Intel's legacy branch); blindvac now runs
+31.0.101.2145 ("On Intel driver 31.0.101.2145" below). The next step if it
+happens again is a run with the Vulkan validation layer to see the call that
+faults. The build now writes a
 minidump on a crash (`src/crash_dump.cpp`, `cobalt_crash_dump`, on by
 default) to the user data folder, and `tools/read_dump.py` reads the faulting
 thread against the linker maps. Five more low-end runs with it (2026-11-18)
@@ -1120,6 +1122,32 @@ the race alternates between 60 and 30 fps from moment to moment; about
 2.2 cores busy. All six got through with no dump written: the
 configuration of the two faults ran clean six times on today's build, and
 no run of any kind (about 26) has faulted since e7382ee. The cause is still unknown.
+
+### On Intel driver 31.0.101.2145 (2026-11-18)
+
+Intel's legacy branch for Gen9 GPUs did get newer drivers: 31.0.101.2141
+(April 2026) and 31.0.101.2145 (September 2026, `gfx_win_101.2145.exe` from
+Intel's 7th-10th Gen download page; SHA512 and Authenticode signature
+checked). Neither release note lists fixed issues. blindvac's device-install
+block covers only the 930MX's IDs and the Windows Update exclusion only
+Windows Update, so Intel's installer ran silently over SSH (`-o -s`) with no
+policy change, then a reboot. The game logs driver version 0x194861
+(101 << 14 | 2145). The same six runs:
+
+| Run | fps | p50 | p95 | p99 | max | frames > 20 / 34 / 50 ms | cores |
+|---|---|---|---|---|---|---|---|
+| 1 | 48.3 | 17.00 | 33.54 | 33.87 | 68.7 | 353 / 6 / 1 | 2.24 |
+| 2 | 45.5 | 17.20 | 33.65 | 33.98 | 49.5 | 439 / 12 / 0 | 2.20 |
+| 3 | 43.1 | 17.92 | 33.68 | 33.99 | 50.6 | 511 / 13 / 1 | 2.14 |
+| 4 | 48.4 | 16.97 | 33.58 | 33.91 | 49.0 | 352 / 11 / 0 | 2.28 |
+| 5 | 50.2 | 16.86 | 33.45 | 33.83 | 49.6 | 295 / 4 / 0 | 2.31 |
+| 6 | 50.8 | 16.81 | 33.52 | 33.82 | 49.9 | 275 / 11 / 0 | 2.34 |
+
+Mean 47.7 fps (43.1-50.8) against 46.0 (44.1-48.5) on 2140, the p99 at the
+same two vblanks, no frame over 100 ms, no dump, no fault. The ranges
+overlap, so the driver is at most a small gain; it is the one to use. With
+2145 there is no driver fault left to explain on blindvac, but two faults in
+about 40 runs on 2140 and none since doesn't prove 2145 fixed it either.
 
 ## The low-end preset at 4K (multivac, 2026-11-18)
 
