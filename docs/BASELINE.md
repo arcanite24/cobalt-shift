@@ -642,7 +642,7 @@ the others string tables, engine and harmonic tuning, thumbnails). Hiding
 zipmount.xml`, so the game reads every mount list at boot; the archives
 themselves open on first use (hiding `FujimiKaido_pri_65.zip` logs nothing at
 boot). With everything in place the failed opens were `stringtables.xml` in
-three packages (an optional probe) and `<id>_pri_65mediadbpatch`.
+three packages (an optional probe) and `<id>_pri_65\media\db\patch\`.
 The `<id>_pri_65\media\db\patch\` failures were not optional: those
 folders are where FM3 looks for each package's database patches
 (`*_merge.slt`, `*_execute.sql`: the DLC cars' and Disc 2 tracks' rows, and
