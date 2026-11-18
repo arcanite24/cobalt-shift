@@ -3,9 +3,14 @@
 // A fault nothing handles (the SDK's vectored handler takes only the guest
 // memory faults it knows) writes <user data root>/crash-<time>.dmp with the
 // threads' stacks and the module list, then lets Windows end the process as
-// before. tools/read_dump.py reads the faulting thread from it. Added for an
-// access violation inside the Intel Vulkan driver on blindvac
-// (docs/BASELINE.md, "An intermittent Intel driver fault on blindvac").
+// before. tools/read_dump.py reads the faulting thread from it. It is
+// installed at the first app hook, before the GPU device exists (writing next
+// to the executable until the user data folder is known), and again once the
+// image is loaded, since something in the process replaces it in between.
+// --cobalt_crash_test=true checks it. A fault inside the NVIDIA driver on
+// blindvac still never reached it; Windows Error Reporting's LocalDumps (a
+// registry key per executable) caught that one, so it is the collector for
+// driver faults (docs/BASELINE.md, "The NVIDIA 930MX on blindvac").
 
 #include "crash_dump.h"
 
@@ -19,9 +24,14 @@
 #include <string>
 
 #include <rex/cvar.h>
+#include <rex/logging/macros.h>
 
 REXCVAR_DEFINE_BOOL(cobalt_crash_dump, true, "Cobalt",
                     "Write a minidump to the user data folder when the process crashes")
+    .lifecycle(rex::cvar::Lifecycle::kRequiresRestart);
+
+REXCVAR_DEFINE_BOOL(cobalt_crash_test, false, "Cobalt",
+                    "Crash on purpose once the image is loaded, to check the minidump")
     .lifecycle(rex::cvar::Lifecycle::kRequiresRestart);
 
 namespace {
@@ -56,8 +66,25 @@ namespace cobalt {
 
 void InstallCrashDump(const std::filesystem::path& folder) {
   if (!REXCVAR_GET(cobalt_crash_dump)) return;
-  g_folder = folder.wstring();
-  SetUnhandledExceptionFilter(WriteDump);
+  if (folder.empty()) {
+    // Before the user data folder is known: next to the executable.
+    wchar_t exe[MAX_PATH];
+    const DWORD length = GetModuleFileNameW(nullptr, exe, MAX_PATH);
+    g_folder = std::filesystem::path(std::wstring(exe, length)).parent_path().wstring();
+  } else {
+    g_folder = folder.wstring();
+  }
+  const LPTOP_LEVEL_EXCEPTION_FILTER previous = SetUnhandledExceptionFilter(WriteDump);
+  // Someone else's filter in its place since the last call: logged, since
+  // that filter had kept faults from reaching this one.
+  if (previous && previous != WriteDump) {
+    REXLOG_WARN("crash dump: replaced another unhandled-exception filter ({})",
+                reinterpret_cast<const void*>(previous));
+  }
+  if (REXCVAR_GET(cobalt_crash_test) && !folder.empty()) {
+    REXLOG_WARN("crash dump: crashing on purpose (cobalt_crash_test)");
+    *static_cast<volatile int*>(nullptr) = 1;
+  }
 }
 
 }  // namespace cobalt

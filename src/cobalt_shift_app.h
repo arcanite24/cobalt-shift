@@ -40,6 +40,7 @@ class CobaltShiftApp : public rex::ReXApp {
   // Stage 0 renders through ShiftGlue's Xenos (PM4) plugin, rexgpu-fh1,
   // unless --gpu_plugin names another one.
   void OnPreSetup(rex::RuntimeConfig& config) override {
+    cobalt::InstallCrashDump({});
     if (config.gpu_plugin.empty()) {
       config.gpu_plugin = "fh1";
     }
@@ -107,6 +108,19 @@ class CobaltShiftApp : public rex::ReXApp {
     // the image's own resolve declares its range and every resolve into it is
     // read back too (FM3-ReGPU's livery writeback, issue B2). An image of
     // those sizes rendered again every frame is a render target, skipped.
+    // present_render_pass_clear (Windows): the presenter clears the swapchain
+    // image with vkCmdClearAttachments in the pass instead of a CLEAR load
+    // op. On an Optimus laptop (blindvac: NVIDIA 930MX, driver 511.69, beside
+    // the UHD 620 that drives the display) the NVIDIA driver read a null
+    // pointer in vkCmdBeginRenderPass of that pass on the first frame, every
+    // time; auto selection prefers the discrete GPU, so the game crashed at
+    // startup unless --vulkan_device picked the UHD 620. A desktop GPU clears
+    // either way at the same cost (docs/BASELINE.md).
+#ifdef _WIN32
+    if (rex::cvar::GetFlagSource("present_render_pass_clear") == rex::cvar::Source::kDefault) {
+      rex::cvar::SetFlagByName("present_render_pass_clear", "false");
+    }
+#endif
     for (const auto& [name, value] : {std::pair{"pinyon_shift_fh1_render_fps_limit", "30"},
                                       std::pair{"gpu_read_pointer_publish_dwords", "1024"},
                                       std::pair{"clear_memory_page_state", "false"},
@@ -198,7 +212,10 @@ class CobaltShiftApp : public rex::ReXApp {
 
   // The image is in memory and no guest code has run: the scene size (#23)
   // edits its static tiling records here.
-  void OnPostLoadXexImage() override { cobalt::ApplySceneSize(); }
+  void OnPostLoadXexImage() override {
+    cobalt::InstallCrashDump({});  // again: logs a filter set since startup
+    cobalt::ApplySceneSize();
+  }
 
   // --perf_log_csv=<path> writes one row of the SDK's counters per frame;
   // the SDK leaves opening it to the app.

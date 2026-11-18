@@ -1023,3 +1023,63 @@ its power budget with the CPU, so the extra CPU work slows the GPU. No switch ag
 `cobalt_shadow_rate` 2/1 +5.8 %, `cobalt_reflect_rate` 2/1 +0.7 %,
 `cobalt_far_car_lod` 3/0 -6.2 % (the same direction as capped). On an iGPU,
 the default cap is both the faster setup and the better place to measure.
+
+## 4K on multivac, current build (2026-11-18)
+
+`tools/bench_race.ps1 -Seconds 30` (first-run route, the Montserrat grid with
+the field driving off), `--draw_resolution_scale_x=3
+--draw_resolution_scale_y=3` (3840x2160, single-sampled), uncapped
+(`--pinyon_shift_fh1_render_fps_limit=180 --host_present_fps_limit=0
+--vsync=false`), RTX 4080 + 5800X: 201.1 fps, p50 4.92 ms, p95 5.86, p99
+6.44, max 8.67 ms, no frame over 20 ms; GPU time 4.9 ms a frame, 3.8 cores,
+1.8 GB resident, 801 MB of EDRAM surfaces and 664 MB of textures. The same
+route at 4K was 188 fps with p99 9.5 ms in the first comparison with
+FM3-ReGPU (docs/RESEARCH.md; ReGPU had 196 fps in that session, not run
+again today). The frame is about as long on the GPU (4.9 ms) as on the CPU, so
+4K at 60 fps leaves about two thirds of this GPU idle.
+
+## The NVIDIA 930MX on blindvac (2026-11-18)
+
+blindvac's GeForce 930MX isn't disabled: Device Manager has it running
+(status OK) beside the UHD 620, which drives the display (an Optimus laptop).
+Vulkan lists it second, and the SDK's auto selection prefers a discrete GPU,
+so without `--vulkan_device=0` the game ran on it and crashed within a second
+of creating the swapchain, every time: c0000005 in `nvoglv64.dll`
+30.0.15.1169 (driver 511.69, January 2022) at offset 0x11824E0, a read of
+address 0.
+
+The in-process minidump (`src/crash_dump.cpp`) never fired for it, even
+installed before the GPU device existed (a deliberate crash,
+`--cobalt_crash_test=true`, does write one). Windows Error Reporting's
+LocalDumps did: `HKLM\SOFTWARE\Microsoft\Windows\Windows Error
+Reporting\LocalDumps\cobalt_shift.exe` (DumpFolder `C:\cobalt\werdumps`,
+DumpType 1, DumpCount 4), left set on blindvac for the next driver fault.
+`tools/read_dump.py` against `rexruntime.map` put the faulting call in
+`VulkanPresenter::PaintAndPresentImpl`: the `vkCmdBeginRenderPass` of the
+swapchain pass on the first frame, where no guest image is drawn yet and the
+pass clears the image with its CLEAR load op. With
+`--present_render_pass_clear=false` (the presenter clears with
+`vkCmdClearAttachments` inside the pass instead) it runs. Cobalt now sets that
+on Windows (`src/cobalt_shift_app.h`), and the default command line runs on
+the 930MX. On multivac's RTX 4080 the change is within noise: the 4K uncapped grid
+above ran 198.9 fps (p50 4.95 ms) with it against 201.1 (4.92 ms) before.
+
+The Season Play race at Ladera, `--cobalt_low_end=true`, 60 fps cap, 30 s
+windows, one run each, back to back (`tools/bench_remote.ps1 -Route season`;
+both windows in the race, 1,814 and 1,876 draws a frame):
+
+| GPU | fps | p50 | p95 | p99 | frames > 20 ms | GPU ms/frame |
+|---|---|---|---|---|---|---|
+| UHD 620 (`--vulkan_device=0`) | 47.2 | 17.09 | 33.53 | 33.85 | 390 | 20.9 |
+| 930MX (`--vulkan_device=1`) | 55.1 | 16.75 | 33.10 | 33.71 | 143 | 17.6 |
+
+The 930MX is 17 % faster with a third of the long frames, in session 0 with
+nothing displayed; on the desktop each frame also crosses to the UHD 620 to
+be shown, which these numbers don't include. One pair in a moving race, so
+the size is approximate; the direction is clear.
+
+The intermittent Intel fault above hasn't recurred: 12 more cold-cache
+low-end boots on the UHD 620 (`--vulkan_device=0`) got past the first 3D
+scene, for 0 faults in about 20 runs since e7382ee. At its earlier rate (2 in
+13) a clean streak that long has about a 4 % chance, so it is likely gone
+or much rarer on later builds; WER will keep a dump if it returns.
