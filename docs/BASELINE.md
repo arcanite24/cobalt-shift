@@ -668,3 +668,32 @@ worth watching for on any route.
 
 Not yet seen: a race on a Disc 2 track (the seeded profile's events are
 locked and its menus have no Free Play).
+
+## Memory and a cold first race on blindvac (#16, #18, 2026-11-17)
+
+`tools/bench_remote.ps1 -Route season` (Ladera, the race AI driving, Disc 2
+content installed), 60 s window in the race. The script now prints memory at
+the end of the window and `perf_summary.py` counts long frames. Each season run
+restores the seed profile, which has no `cache` folder, so the default run is
+a cold start. `-KeepCache` keeps the previous run's shader and pipeline caches.
+
+| | cold caches | warm caches (355 pipelines stored) |
+|---|---|---|
+| race window | 30.1 fps, p99 50.16 ms, max 51.4 ms | 29.8 fps, p99 50.25 ms, max 50.8 ms |
+| frames > 50 ms / > 100 ms in the window | 31 / 0 | 35 / 0 |
+| process CPU in the window | 1.79 cores | 1.74 cores |
+| frames > 100 ms, whole run | 18, 5.27 s in all | 20, 5.17 s in all |
+| working set (peak) | 2,580 MB (2,580) | 2,566 MB (2,577) |
+| private bytes | 2,245 MB | 2,226 MB |
+| GPU memory (UHD 620, shared) | 1,403 MB | 1,400 MB |
+| system RAM free (16 GB machine) | 9,736 MB | 9,740 MB |
+
+- Every frame over 100 ms falls in the loads (menu to event, about 103 s in;
+  the race load, about 183 to 200 s), in both runs and at the same moments. A
+  cold cache adds about 0.1 s to them in all. Pipelines are created while the
+  track loads (212 of 355 in the race load), so none are built mid-race. A
+  pipeline seed (#16) would save at most that tenth of a second here.
+- The game needs about 2.6 GB of system memory plus 1.4 GB the iGPU takes from
+  it: about 4 GB in a race, which fits an 8 GB machine. The 1.4 GB of GPU
+  memory is the target for idle surface release (#18); its 14.3 -> 5.7 GB gain
+  was measured at 4K, and blindvac renders at 1280x720.

@@ -35,12 +35,14 @@ def main():
     data = {}
     for c in cols:
         try:
-            data[c] = [float(r[c]) for r in rows if r[c] != ""]
+            data[c] = [float(r[c]) for r in rows if r[c] not in ("", None)]
         except ValueError:
             continue
     ft = [v / 1000.0 for v in data["frame_time_us"] if v > 0]
     print(f"rows {len(rows)}  frame ms: p50 {pct(ft, 50):.2f}  p95 {pct(ft, 95):.2f}  "
           f"p99 {pct(ft, 99):.2f}  max {max(ft):.2f}  -> {1000.0 / statistics.mean(ft):.1f} fps avg")
+    # Long frames: hitches a player sees (two and three vblanks at 60 Hz, and worse).
+    print("long frames: " + "  ".join(f">{t} ms {sum(1 for v in ft if v > t)}" for t in (20, 34, 50, 100)))
     print(f"{'counter':48s} {'mean':>14s} {'p50':>14s} {'p95':>14s} {'max':>14s}")
     for c, v in data.items():
         if c == "frame_time_us" or not v or max(v) == 0:

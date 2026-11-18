@@ -18,7 +18,10 @@ param(
     # As bench_race.ps1: first-run, or season (C:\cobalt\seeds\after-first-race
     # restored into C:\cobalt\user-season, the race AI driving).
     [ValidateSet('first-run', 'season')]
-    [string]$Route = 'first-run'
+    [string]$Route = 'first-run',
+    # With -Route season: keep the last run's shader and pipeline caches
+    # (user-season\cache), so the race measures a warm start, not a cold one.
+    [switch]$KeepCache
 )
 
 # bench_race.ps1 for another machine on the LAN (the low-end target is
@@ -63,8 +66,11 @@ if ($Route -eq 'season') {
     $user = 'C:\cobalt\user-season'
     $arguments += '--cobalt_ai_player=true'
     if (-not $PSBoundParameters.ContainsKey('RaceWait')) { $RaceWait = 240 }
-    $userSetup = "Remove-Item -Recurse -Force $user -ErrorAction SilentlyContinue; " +
-        "Copy-Item -Recurse C:\cobalt\seeds\after-first-race $user; Set-Content C:\cobalt\user_root.txt $user"
+    $keep = if ($KeepCache) { "Move-Item $user\cache C:\cobalt\cache-kept -ErrorAction SilentlyContinue; " } else { '' }
+    $restore = if ($KeepCache) { "; Move-Item C:\cobalt\cache-kept $user\cache -ErrorAction SilentlyContinue" } else { '' }
+    $userSetup = "Remove-Item -Recurse -Force C:\cobalt\cache-kept -ErrorAction SilentlyContinue; $keep" +
+        "Remove-Item -Recurse -Force $user -ErrorAction SilentlyContinue; " +
+        "Copy-Item -Recurse C:\cobalt\seeds\after-first-race $user; Set-Content C:\cobalt\user_root.txt $user$restore"
 }
 Invoke-Remote @"
 if (Get-Process cobalt_shift -ErrorAction SilentlyContinue) { throw 'cobalt_shift is already running' }
@@ -121,9 +127,19 @@ Start-Sleep -Seconds $Seconds
 `$p.Refresh()
 `$cores = (`$p.TotalProcessorTime.TotalSeconds - `$cpu0) / ((Get-Date) - `$t0).TotalSeconds
 `$rows1 = @(Get-Content C:\cobalt\logs\bench.csv).Count - 1
+# Memory at the end of the window: the process, and what the GPU driver holds for it.
+try {
+`$gpu = (Get-Counter -ErrorAction SilentlyContinue '\GPU Process Memory(pid_*)\Shared Usage', '\GPU Process Memory(pid_*)\Dedicated Usage').CounterSamples |
+    Where-Object { `$_.InstanceName -like "pid_`$(`$p.Id)_*" }
+`$shared = (`$gpu | Where-Object Path -like '*shared usage' | Measure-Object CookedValue -Sum).Sum / 1MB
+`$dedicated = (`$gpu | Where-Object Path -like '*dedicated usage' | Measure-Object CookedValue -Sum).Sum / 1MB
+`$free = (Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1KB
+"memory MB: working set {0:N0} (peak {1:N0})  private {2:N0}  GPU shared {3:N0}  GPU dedicated {4:N0}  system free {5:N0}" -f (`$p.WorkingSet64 / 1MB), (`$p.PeakWorkingSet64 / 1MB), (`$p.PrivateMemorySize64 / 1MB), `$shared, `$dedicated, `$free
+} catch { "memory MB: not measured (`$_)" }
 "`$rows0 `$rows1 `$cores"
 "@
-    $first, $last, $cores = ($measure | Select-Object -Last 1) -split ' '
+    $memory = $measure | Where-Object { $_ -like 'memory MB:*' } | Select-Object -Last 1
+    $first, $last, $cores = ($measure | Where-Object { $_ -match '^\d+ \d+ ' } | Select-Object -Last 1) -split ' '
     $first = [int]$first; $last = [int]$last; $cores = [double]$cores
     if ($Interactive) { Save-Shot "$stem.png" }
 } finally {
@@ -138,7 +154,7 @@ Start-Sleep -Seconds $Seconds
 $frames = $last - $first
 $summary = @("remote bench $Name on ${HostName}  route: $Route  args: $($GameArguments -join ' ')",
     ('process cores busy: {0:N2}  frames in window: {1}  ({2:N1}/s)  CPU per frame: {3:N2} ms' -f
-        $cores, $frames, ($frames / $Seconds), ($cores * $Seconds * 1000 / [Math]::Max(1, $frames))), '') +
+        $cores, $frames, ($frames / $Seconds), ($cores * $Seconds * 1000 / [Math]::Max(1, $frames))), $memory, '') +
     @(& $python -I (Join-Path $PSScriptRoot 'perf_summary.py') "$stem.csv" $first $last)
 $summary | Set-Content -LiteralPath "$stem.txt"
 $summary
