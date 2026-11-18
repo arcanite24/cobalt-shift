@@ -45,6 +45,7 @@ set(COBALT_SHIFT_SOURCES
     src/frontend_rate.cpp
     src/render_rates.cpp
     src/ai_player.cpp
+    src/frozen_grid.cpp
     src/scene_size.cpp
 )
 

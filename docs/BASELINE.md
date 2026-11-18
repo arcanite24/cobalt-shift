@@ -840,3 +840,96 @@ range, so they stay on the GPU; the saved livery looks right without them.
 Entering APPLY DECALS crashed (c0000005 in rexgpu-fh1.dll, in
 IsReadbackEnclosed): an iterator was used after the `push_back` that
 invalidated it. Fixed in the SDK (76f9d72a).
+
+## How much FM3 shares with FH1 (#2, CB-0.2, 2026-11-18)
+
+`tools/masked_hash.py` hashes every function of two recompiled games from the
+instruction comments in their generated sources. Like Lavender's LV-0.2 it
+masks branch targets, `lis`/`addis` immediates and r2/r13 offsets ("mask B");
+`--all-d` also masks every displacement and immediate. As a check, two FH1 v4
+codegen trees (`horizon1-recomp` and `horizon1-901`) match 99.3 % of code
+bytes.
+
+| FM3 (44,118 functions, 10.0 MB) against FH1 v4 (76,257, 14.7 MB) | mask B | every D-form field |
+|---|---|---|
+| functions found in FH1 | 18.2 % | 50.5 % |
+| functions of 8+ instructions | 13.9 % | 43.0 % |
+| code bytes | **7.0 %** | **21.1 %** |
+| unique matches in address order | 83.1 % | 84.5 % |
+
+FH2 shares 70.5 % of its code bytes with FH1 under mask B. FM3 shares 7 %,
+and what it does share sits mostly in the XDK and D3D ranges (0x82400000 to
+0x825FFFFF: 10-13 %, 27-30 % with every field masked; 0x82A00000 and up:
+18 %, 35-37 %). The game ranges match 2-6 %. FM3 is three years older than
+FH1; code that does the same work but was rebuilt with other register
+choices fails the masked hash, so this is a lower bound on shared source.
+
+Shader files (`.fxobj`, loose and in zips, zip CRC and size): FM3 has 177
+distinct files and FH1's base disc 361. Only 4 are byte-identical
+(`track/reference`, and the glass, smoke and sparks particles), and 13 file
+names occur in both.
+
+So Pinyon's and Lavender's game-level findings (hook addresses, game
+structures) don't carry over by address mapping: each must be found again
+in FM3. That's how this port has worked so far: its game hooks come from
+FM3-ReGPU, which analysed the same `default.xex`. What carries over is below
+the game: the XDK and D3D code, and the PM4 executor (rexgpu-fh1), which
+renders FM3 without game hooks.
+
+## blindvac's occasional long race frames (2026-11-18)
+
+The Ladera race windows on blindvac show 0-3 frames of 150-280 ms in 40 s
+(for example rows 10310, 10589 and 11263 of `remote-blindvac-cube-true.csv`,
+which were 150, 151 and 183 ms). Their counters:
+
+- the GPU's own time for the frame (`guest_frame_gpu_time_ns`) was 25-30 ms,
+  as usual;
+- the command thread waited 120-160 ms on a fence
+  (`gpu_thread_fence_wait_ns`), and submission was busy 160-200 ms;
+- no pipeline cache misses, no readbacks, and uploads of 50-370 KB.
+
+So no game or renderer work is behind them: the GPU finished on time and
+the wait is for the driver to signal it. They don't recur at a fixed period.
+The cause is most likely the Intel driver or Windows on that laptop, outside
+our control; at about 0.1 % of frames they don't move the averages. The
+load frames (1-3 s while a track streams in, 70-80 MB of uploads) are a
+separate matter and happen before the green light.
+
+## Frozen grid and live A/B switches (#5, CB-0.5, 2026-11-18)
+
+`src/frozen_grid.cpp` (FM3-ReGPU's test grid, same `default.xex`):
+`--cobalt_freeze_grid_at=9` stops the world on the Season Play grid at Ladera
+when the race start clock reaches 9.0 s, the countdown's "1". It does this by
+setting the main loop's frame time to 0 (sub_821F6AF8's return to
+0x821F6004), so the cars, cameras and clocks stop while every frame is still
+drawn. `--cobalt_freeze_time` freezes or releases the world anywhere. With
+`--cobalt_live_file=<path>`, lines `<cvar> <value>` written to that file are
+applied within half a second, which works for any cvar that reloads live.
+
+`tools/bench_ab.ps1 -Name x -Uncapped -Switch cvar=off/on,...` boots the
+season route into the frozen grid, drops a warm-up window, then measures each
+switch over `-Rounds` pairs of 5 s windows in ABBA order. Each window counts
+as its median frame time (`tools/ab_windows.py`). Several switches share one
+boot, about 4 minutes plus 30 s per round per switch.
+
+Two lessons from the first runs, multivac uncapped (about 220 fps,
+CPU-bound):
+
+- Counting frames per window was too noisy: dips of a few frames moved a
+  window by up to 10 %. The median frame time is steady.
+- With off always first, a null A/B (shadow rate 1 against 1) came out
+  "+2.4 %, on faster in every round": the second window of a pair was faster.
+  ABBA order cancels that.
+
+| Switch (6 ABBA rounds, multivac uncapped) | off | on | on vs off by round | avg |
+|---|---|---|---|---|
+| null (`cobalt_shadow_rate` 1 / 1) | 222.1 | 221.6 | -2.4 to +1.7 % | -0.2 % |
+| `cobalt_shadow_rate` 1 / 2 | 221.2 | 224.5 | -0.9 to +4.7 % | +1.5 %, unclear |
+| `cobalt_reflect_rate` 1 / 2 | 216.4 | 217.5 | -2.6 to +4.3 % | +0.5 %, unclear |
+| `cobalt_far_car_lod` 0 / 3 | 216.5 | 226.5 | +1.3 to +9.2 % | **+4.6 %, every round** |
+
+So the noise floor here is about ±2.5 % for a round and about ±1 % for the
+6-round average. That is above FM3-ReGPU's ±0.3 %, because multivac is a
+desktop in use and this scene is CPU-bound. The rates were chosen for the
+UHD 620, where the GPU is the limit; on multivac only the far-car LOD
+reduces CPU work enough to show.

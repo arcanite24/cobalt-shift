@@ -25,9 +25,11 @@ direct_calls_bypass_thunk = true
 # minimap at a smaller scene size (src/scene_size.cpp). 0x828F8858: a car's driver
 # (src/ai_player.cpp). 0x82798890: the tiling set-up, run per scenario (front
 # end or race), for the front end's frame limit (src/frontend_rate.cpp).
+# 0x821F6AF8: the main loop's frame time, 0x822E6AD0: the race start sequence
+# (src/frozen_grid.cpp).
 host_overridden_functions = [0x824AAA68, 0x827B5088, 0x827B4D30, 0x82592168, 0x827B4E40,
                              0x827FF238, 0x827FDB88, 0x828329C8, 0x824B4068, 0x828F8858,
-                             0x82798890]
+                             0x82798890, 0x821F6AF8, 0x822E6AD0]
 fold_rodata_loads = true
 host_local_register_saves = true
 host_local_lr = true
