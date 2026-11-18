@@ -766,3 +766,14 @@ The SDK's other mobile-only switches, all three together on top
 `vulkan_shared_memory_texel_buffer`), warm caches: 37.8 fps against 37.0,
 within noise. They stay off (IEEE vertex math also turns 0 * Inf vertices
 into NaN).
+
+## Cube and 3D fetches (#15, 2026-11-18)
+
+A count of the texture fetches the translator emitted in a season run: 451
+2D, 49 cube, no 1D and no 3D or stacked. So the 3D-or-stacked run-time branch
+never runs in FM3. A cube fetch's remaining branch is a switch on the face's
+major axis, which depends on each pixel's coordinates, not on the fetch
+constant, so literal specialisation can't remove it. Done branchless with
+selects, blindvac's season race (cold caches, 30 s): 37.8 fps against 39.0
+with the switch, no gain; reverted. The signedness switch, the part
+specialisation could fold, is folded by `spirv_specialize_texture_signs`.
