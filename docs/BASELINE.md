@@ -734,3 +734,11 @@ pass of 30 s windows, same codegen otherwise:
 `-fno-ms-volatile` (run-to-run noise on this route was about 2 %). The first
 run and season routes both play at 60 fps capped, with no frame over 20 ms in
 their windows.
+
+On blindvac (deployed, season route, 30 s window) the frame rate stays at
+31 fps: the UHD 620 is GPU-bound, so the CPU saving shows as idle time, not
+frames. Memory is unchanged (working set 2,562 MB, GPU 1,400 MB). The window
+had one 282 ms frame, all of it GPU time (`guest_frame_gpu_time_ns` 280 ms,
+the fence wait 258 ms) with nothing logged at that moment: no pipeline build,
+no readback. The cold and warm runs before had none in 60 s windows. Watch for
+it in later blindvac runs.
