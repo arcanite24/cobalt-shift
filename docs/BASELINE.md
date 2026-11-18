@@ -1097,3 +1097,27 @@ configuration of the two faulting runs, which were `bench_remote.ps1`
 season runs with `--perf_log_csv` and `--cobalt_ai_player=true` into the
 race, so this doesn't show the fault is gone. Its cause is unknown; WER
 LocalDumps on blindvac will keep a dump if it returns.
+
+## The low-end target in the race, six runs (2026-11-18)
+
+blindvac, UHD 620, `--cobalt_low_end=true`, default 60 fps cap,
+`tools/bench_remote.ps1 -Route season -KeepCache -Seconds 30`: the Season
+Play race at Ladera with the race AI driving the player's car, a 30 s window
+in the race (1,683-1,942 draws a frame). This is also the configuration of
+the two runs that hit the Intel driver fault.
+
+| Run | fps | p50 | p95 | p99 | max | frames > 20 / 34 / 50 ms | cores |
+|---|---|---|---|---|---|---|---|
+| 1 | 45.8 | 17.10 | 33.61 | 33.98 | 49.6 | 434 / 11 / 0 | 2.13 |
+| 2 | 45.7 | 17.17 | 33.58 | 33.96 | 66.2 | 434 / 10 / 1 | 2.24 |
+| 3 | 48.5 | 16.91 | 33.60 | 33.88 | 50.5 | 350 / 9 / 1 | 2.21 |
+| 4 | 45.9 | 17.07 | 33.67 | 33.98 | 49.7 | 428 / 12 / 0 | 2.16 |
+| 5 | 45.7 | 17.14 | 33.59 | 33.79 | 48.3 | 433 / 5 / 0 | 2.18 |
+| 6 | 44.1 | 17.56 | 33.66 | 33.92 | 34.2 | 483 / 7 / 0 | 2.15 |
+
+Mean 46.0 fps (44.1-48.5), p99 at two vblanks (34 ms) in every run, and no
+frame over 100 ms. Under the cap a frame takes one or two 60 Hz vblanks, so
+the race alternates between 60 and 30 fps from moment to moment; about
+2.2 cores busy. All six got through and the WER dump folder stayed empty: the
+configuration of the two faults ran clean six times on today's build, and
+no run of any kind (about 26) has faulted since e7382ee. The cause is still unknown.
