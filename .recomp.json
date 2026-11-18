@@ -1,0 +1,19 @@
+{
+  "$schema": "https://recomp.fyi/schema/v1.json",
+  "game": "Forza Motorsport 3",
+  "wikidata": "Q843456",
+  "system": "Xbox 360",
+  "type": "recomp",
+  "project": "Cobalt Shift",
+  "status": "playable",
+  "targets": ["Windows"],
+  "toolchain": "Shiftglue",
+  "approach": "Static recompilation with ShiftGlue, our ReXGlue fork; performance and low hardware requirements first, exact console behaviour second",
+  "maintainers": [{ "name": "arcanite24", "link": "https://github.com/arcanite24" }],
+  "links": [
+    { "label": "ShiftGlue", "url": "https://github.com/arcanite24/shiftglue-sdk" },
+    { "label": "Pinyon Shift (FH1)", "url": "https://github.com/arcanite24/pinyon-shift" },
+    { "label": "Lavender Shift (FH2)", "url": "https://github.com/arcanite24/lavender-shift" }
+  ],
+  "notes": "Menus, career and races run natively. No prebuilt release yet: you build it from your own discs. Disc 2 (Content Install Disc) is optional and adds its extra cars and tracks."
+}
