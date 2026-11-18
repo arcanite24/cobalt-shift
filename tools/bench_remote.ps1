@@ -21,7 +21,13 @@ param(
     [string]$Route = 'first-run',
     # With -Route season: keep the last run's shader and pipeline caches
     # (user-season\cache), so the race measures a warm start, not a cold one.
-    [switch]$KeepCache
+    [switch]$KeepCache,
+    # With -Route season: freeze the grid and A/B these live switches,
+    # "cvar=off/on" each, in ABBA rounds as bench_ab.ps1 does (instead of the
+    # -Seconds window). -Rounds pairs of -Window-second windows per switch.
+    [string[]]$Switch = @(),
+    [int]$Rounds = 6,
+    [int]$Window = 6
 )
 
 # bench_race.ps1 for another machine on the LAN (the low-end target is
@@ -41,6 +47,8 @@ $root = Split-Path -Parent $PSScriptRoot
 $logs = New-Item -ItemType Directory -Force -Path (Join-Path $root '.local/logs')
 $stem = Join-Path $logs "remote-$HostName-$Name"
 $python = Join-Path $root '.local/toolchain/python-3.13.15/python.exe'
+# pwsh -File passes an array as one comma-joined string.
+$GameArguments = @($GameArguments | ForEach-Object { $_ -split ',(?=--)' } | Where-Object { $_ })
 
 # Runs a PowerShell script on the host, encoded so quoting survives (CLAUDE.md).
 function Invoke-Remote([string]$Script) {
@@ -65,6 +73,7 @@ $userSetup = 'Remove-Item C:\cobalt\user_root.txt -ErrorAction SilentlyContinue'
 if ($Route -eq 'season') {
     $user = 'C:\cobalt\user-season'
     $arguments += '--cobalt_ai_player=true'
+    if ($Switch) { $arguments += '--cobalt_freeze_grid_at=9', "--cobalt_live_file=$user\live.txt" }
     if (-not $PSBoundParameters.ContainsKey('RaceWait')) { $RaceWait = 240 }
     $keep = if ($KeepCache) { "Move-Item $user\cache C:\cobalt\cache-kept -ErrorAction SilentlyContinue; " } else { '' }
     $restore = if ($KeepCache) { "; Move-Item C:\cobalt\cache-kept $user\cache -ErrorAction SilentlyContinue" } else { '' }
@@ -118,8 +127,34 @@ try {
         }
         Start-Sleep -Seconds 2
     }
+    if ($Switch) {
+        # Frozen-grid A/B on the host: a warm-up window, then ABBA rounds.
+        $specs = @($Switch | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
+        $abLines = Invoke-Remote @"
+function Rows { @(Get-Content C:\cobalt\logs\bench.csv).Count - 1 }
+function SetLive(`$line) {
+    if (`$line) { Set-Content -LiteralPath $user\live.txt -Value `$line }
+    for (`$i = 0; `$i -lt 50 -and (Test-Path $user\live.txt); `$i++) { Start-Sleep -Milliseconds 100 }
+    Start-Sleep -Seconds 2
+}
+function Sample { `$a = Rows; Start-Sleep -Seconds $Window; "`${a}:`$(Rows)" }
+SetLive ''; `$null = Sample
+foreach (`$spec in @('$($specs -join "','")')) {
+    `$cvar, `$values = `$spec -split '='; `$off, `$on = `$values -split '/'
+    for (`$r = 0; `$r -lt $Rounds; `$r++) {
+        foreach (`$side in `$(if (`$r % 2) { 'on', 'off' } else { 'off', 'on' })) {
+            SetLive ("`$cvar " + `$(if (`$side -eq 'on') { `$on } else { `$off }))
+            "ab `$spec `$side `$(Sample)"
+        }
+    }
+    SetLive "`$cvar `$off"
+}
+"@
+        $abLines = @($abLines | Where-Object { $_ -like 'ab *' })
+        if (-not $abLines) { Write-Warning "no A/B windows: the game exited before the frozen grid (see the host's Application event log)" }
+    }
     # The window: process CPU and perf CSV rows, measured on the host.
-    $measure = Invoke-Remote @"
+    $measure = if ($Switch) { @() } else { Invoke-Remote @"
 `$p = Get-Process cobalt_shift -ErrorAction Stop
 `$rows0 = @(Get-Content C:\cobalt\logs\bench.csv).Count - 1
 `$cpu0 = `$p.TotalProcessorTime.TotalSeconds; `$t0 = Get-Date
@@ -137,10 +172,12 @@ try {
 "memory MB: working set {0:N0} (peak {1:N0})  private {2:N0}  GPU shared {3:N0}  GPU dedicated {4:N0}  system free {5:N0}" -f (`$p.WorkingSet64 / 1MB), (`$p.PeakWorkingSet64 / 1MB), (`$p.PrivateMemorySize64 / 1MB), `$shared, `$dedicated, `$free
 } catch { "memory MB: not measured (`$_)" }
 "`$rows0 `$rows1 `$cores"
-"@
+"@ }
+    if (-not $Switch) {
     $memory = $measure | Where-Object { $_ -like 'memory MB:*' } | Select-Object -Last 1
     $first, $last, $cores = ($measure | Where-Object { $_ -match '^\d+ \d+ ' } | Select-Object -Last 1) -split ' '
     $first = [int]$first; $last = [int]$last; $cores = [double]$cores
+    }
     if ($Interactive) { Save-Shot "$stem.png" }
 } finally {
     Invoke-Remote 'Stop-Process -Name cobalt_shift -ErrorAction SilentlyContinue; Wait-Process -Name cobalt_shift -Timeout 30 -ErrorAction SilentlyContinue' | Out-Null
@@ -151,6 +188,32 @@ try {
 }
 & scp -q -o BatchMode=yes "${HostName}:C:/cobalt/logs/bench.csv" "$stem.csv" 2>$null
 & scp -q -o BatchMode=yes "${HostName}:C:/cobalt/logs/bench.log" "$stem.log" 2>$null
+if ($Switch) {
+    # Each window's mean frame time as fps (tools/ab_windows.py --mean): at the
+    # 60 fps cap the median jumps between one and two vblanks.
+    $summary = @("remote A/B $Name on ${HostName} (frozen grid)  args: $($GameArguments -join ' ')")
+    if (-not $abLines) { $summary += 'no A/B windows: the game exited before the frozen grid' }
+    $abLines | Set-Content -LiteralPath "$stem-windows.txt"
+    foreach ($spec in @($abLines | ForEach-Object { ($_ -split ' ')[1] } | Select-Object -Unique)) {
+        $rows = @($abLines | Where-Object { ($_ -split ' ')[1] -eq $spec })
+        $fps = @((& $python -I (Join-Path $PSScriptRoot 'ab_windows.py') --mean "$stem.csv" @($rows | ForEach-Object { ($_ -split ' ')[3] })) -split ' ' |
+            ForEach-Object { [Math]::Round(1000 / [double]$_, 1) })
+        $off = @(); $on = @()
+        for ($i = 0; $i -lt $rows.Count; $i++) { if (($rows[$i] -split ' ')[2] -eq 'on') { $on += $fps[$i] } else { $off += $fps[$i] } }
+        $diff = @(for ($r = 0; $r -lt $off.Count; $r++) { [Math]::Round(100 * ($on[$r] - $off[$r]) / $off[$r], 1) })
+        $avgOff = ($off | Measure-Object -Average).Average; $avgOn = ($on | Measure-Object -Average).Average
+        $verdict = if (@($diff | Where-Object { $_ -gt 0 }).Count -eq $diff.Count) { 'on faster in every round' }
+            elseif (@($diff | Where-Object { $_ -lt 0 }).Count -eq $diff.Count) { 'off faster in every round' }
+            else { 'rounds disagree: no clear difference' }
+        $summary += @('', $spec,
+            ('  off: {0}  avg {1:N1} fps (mean frame)' -f ($off -join ' '), $avgOff),
+            ('  on:  {0}  avg {1:N1} fps (mean frame)' -f ($on -join ' '), $avgOn),
+            ('  on vs off by round: {0} %  avg {1:N1} %  -> {2}' -f ($diff -join ' '), (100 * ($avgOn - $avgOff) / $avgOff), $verdict))
+    }
+    $summary | Set-Content -LiteralPath "$stem.txt"
+    $summary
+    return
+}
 $frames = $last - $first
 $summary = @("remote bench $Name on ${HostName}  route: $Route  args: $($GameArguments -join ' ')",
     ('process cores busy: {0:N2}  frames in window: {1}  ({2:N1}/s)  CPU per frame: {3:N2} ms' -f

@@ -945,3 +945,49 @@ The build with the frozen-grid hooks (e7382ee) on blindvac, season route, 25 s
 window: 38.0 frames a second (p50 31.8 ms), no frame over 100 ms, working set
 2,555 MB. The race start was logged and GO came at 9.5 s; without
 `--cobalt_freeze_grid_at` the hooks only log.
+
+## An intermittent Intel driver fault on blindvac (2026-11-18)
+
+Two low-end season runs (e7382ee, `--cobalt_low_end=true`) ended about 65 s
+after launch, in the intro, with an access violation inside the Intel Vulkan
+driver: `igvk64.dll` 31.0.101.2140, offset 0x5CA146, the same both times. Six
+more low-end runs of the same build, with and without the A/B arguments, got
+through. In a surviving run that moment (frames 3,000-3,600) is where the
+first 3D scene starts: native surfaces go from 4 to 11 and 27 shaders are
+seen for the first time. So the fault is most likely in the driver's pipeline
+or first-scene setup. It doesn't occur on multivac. The driver DLL is dated November 2025 (Gen9
+GPUs such as the UHD 620 are on Intel's legacy branch), so a newer driver may
+not exist; the next step if it keeps happening is a run with the Vulkan
+validation layer to see the call that faults.
+
+A blindvac check of the paint editor wasn't done: its screenshots show the
+desktop, so the menus would have to be driven blind, and the scripted title
+sequence doesn't reach the career hub reliably. The fix it would check (#20,
+an iterator used after the `push_back` that invalidated it) is plain CPU
+code, and the driver path it uses (resolve readbacks) already runs in every
+blindvac race.
+
+## The low-end cuts on blindvac's frozen grid (2026-11-18)
+
+`tools/bench_remote.ps1 -Route season -Switch cvar=off/on,...` runs the
+frozen-grid A/B on another machine. blindvac, `--cobalt_low_end=true`, 60 fps
+cap, 6 ABBA rounds of 6 s windows. Each switch goes from the preset's value
+("off") to full rate or detail ("on"), so a negative result is what the cut
+saves. Under the cap FM3 takes one or two 60 Hz vblanks a frame, so a
+window's median jumps between about 55 and 32 fps; these use the mean frame
+time (`ab_windows.py --mean`).
+
+| Switch (preset / full) | preset | full | on vs off by round | avg |
+|---|---|---|---|---|
+| null (`cobalt_shadow_rate` 2 / 2) | 42.8 | 43.8 | -3.1 to +10.9 % | +2.2 % |
+| `cobalt_shadow_rate` 2 / 1 | 42.5 | 42.3 | -14.3 to +5.5 % | -0.5 % |
+| `cobalt_reflect_rate` 2 / 1 | 42.1 | 41.1 | -13.7 to +13.0 % | -2.3 % |
+| `cobalt_mirror_rate` 2 / 1 | 41.9 | 41.6 | -9.0 to +11.5 % | -0.6 % |
+| `cobalt_far_car_lod` 3 / 0 | 42.6 | 39.1 | -15.8 to +2.1 %, median -8.3 % | **-8.0 %** |
+
+The far-car LOD is the low-end cut that clearly pays on the grid: full detail
+for distant AI cars costs 8 %, slower in 5 of 6 rounds. Half-rate shadows,
+reflections and mirror don't show at this noise (about ±10 % a round on
+blindvac, from occasional slow windows). On a static grid the chase camera
+doesn't show the mirror, and the shadow and reflection passes are cheaper than
+when the cars are spread out and moving, so the preset keeps them.
