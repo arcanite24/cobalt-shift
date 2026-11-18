@@ -23,9 +23,11 @@ direct_calls_bypass_thunk = true
 # 0x827FF238: the reflection cube faces, 0x827FDB88: the mirror, 0x828329C8:
 # a car's draw (src/render_rates.cpp). 0x824B4068: D3D's SetViewport, for the
 # minimap at a smaller scene size (src/scene_size.cpp). 0x828F8858: a car's driver
-# (src/ai_player.cpp).
+# (src/ai_player.cpp). 0x82798890: the tiling set-up, run per scenario (front
+# end or race), for the front end's frame limit (src/frontend_rate.cpp).
 host_overridden_functions = [0x824AAA68, 0x827B5088, 0x827B4D30, 0x82592168, 0x827B4E40,
-                             0x827FF238, 0x827FDB88, 0x828329C8, 0x824B4068, 0x828F8858]
+                             0x827FF238, 0x827FDB88, 0x828329C8, 0x824B4068, 0x828F8858,
+                             0x82798890]
 fold_rodata_loads = true
 host_local_register_saves = true
 host_local_lr = true

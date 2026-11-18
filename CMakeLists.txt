@@ -41,6 +41,7 @@ set(COBALT_SHIFT_SOURCES
     src/disc2_content.cpp
     src/pad_script.cpp
     src/ring_wait.cpp
+    src/frontend_rate.cpp
     src/render_rates.cpp
     src/ai_player.cpp
     src/scene_size.cpp
