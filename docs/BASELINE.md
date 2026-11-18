@@ -210,9 +210,10 @@ blindvac is an ASUS X510UR: Core i5-8250U, Intel UHD 620 (driver
 route there over SSH. The game runs in session 0: Vulkan renders and the
 frame loop runs, but nothing is displayed. The build goes to `C:\cobalt\bin`
 with an app-local VC++ runtime, and the disc to `C:\cobalt\game\disc`. Vulkan
-lists the disabled NVIDIA 930MX first and picks it by default. The one run on it
+lists the NVIDIA 930MX too, and the SDK picks it by default. The one run on it
 (started in the interactive session) stopped logging during startup, so the
-bench passes `--vulkan_device=0` to use the UHD 620. Session 0 shows nothing,
+bench passes `--vulkan_device=0` to use the UHD 620 (that was a driver fault,
+fixed later: "The NVIDIA 930MX on blindvac"). Session 0 shows nothing,
 so these numbers don't include presentation, and nothing yet checks the
 UHD 620's image.
 

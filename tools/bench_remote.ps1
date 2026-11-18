@@ -65,8 +65,8 @@ function Save-Shot([string]$Path) {
     & scp -q -o BatchMode=yes "${HostName}:C:/cobalt/logs/shot.png" $Path 2>$null
 }
 
-# blindvac's NVIDIA 930MX is disabled for Windows, but Vulkan still lists it
-# and picks it by default (the game hung there); the UHD 620 is device 0.
+# blindvac's UHD 620 is device 0, the bench's reference; the default picks the
+# NVIDIA 930MX (docs/BASELINE.md, "The NVIDIA 930MX on blindvac").
 $arguments = @('--perf_log_csv=C:\cobalt\logs\bench.csv', '--log_file=C:\cobalt\logs\bench.log',
     '--vulkan_device=0') + $GameArguments
 # The first-run route answers the Disc 2 prompt, which installed content removes.
