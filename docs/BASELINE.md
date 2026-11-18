@@ -551,7 +551,16 @@ menu; and A is the title screen's button, not START.
 blindvac is GPU-bound at Ladera: 33.3 ms of GPU a frame, so frames land on
 every other 60 Hz vblank, where the parked Montserrat grid ran 39-40 fps.
 
-Ladera's road shows blocky low-resolution texture over the asphalt and
-run-off, the same with Cobalt's defaults and with untiling,
-`spirv_implicit_lod_2d` and `spirv_fast_pixel_math` all off
-(`bench-ladA.png`, `bench-ladP.png`).
+Ladera's road showed blocky bands over the asphalt and run-off
+(`bench-ladA.png`). Untiling, `spirv_implicit_lod_2d`,
+`spirv_fast_pixel_math` and the texture cache's packed-mip keys and
+band/layer reloads didn't matter. FM3-QUIRKS Q18 was the cause. When a
+track loads, FM3 renders road strips (32x512; Ladera resolved 128) and its
+CPU code compresses them to DXT1 to compose the road's detail image. The
+SDK kept those resolves on the GPU, so the CPU compressed stale memory.
+The SDK's `fh1_readback_resolve_sizes` now reads chosen color resolve
+sizes back to guest RAM before the next CPU-visible fence. Cobalt lists
+the strips and the car pictures (512x256, 256x128), as FM3-ReGPU does. The
+asphalt is right now (`bench-ladRB.png`), at a one-off cost at track load.
+The start line's painted checks still have stair-stepped edges, which
+look like a point-sampled mask; that needs a console reference.

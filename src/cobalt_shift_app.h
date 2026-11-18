@@ -77,12 +77,22 @@ class CobaltShiftApp : public rex::ReXApp {
     // frame uncapped on the 5800X (250 -> 256-265 fps), the same image, and
     // the whole HUD at 960x540. The menus and garage tile at 4X and draw a
     // depth-only reset per tile; the SDK runs those in their tiles' rows.
+    //
+    // fh1_readback_resolve_sizes: images FM3's CPU code reads right after
+    // rendering them, which stay on the GPU otherwise. At a track load, four
+    // 32x512 road strips that it compresses to DXT1 and composes into the
+    // road's detail image (FM3-QUIRKS Q18; stale, Ladera's asphalt showed
+    // blocky bands, #25). When a car changes, its 512x256 picture and
+    // 256x128 thumbnail, which it copies into the car's saved images.
+    // FM3-ReGPU writes the same ones back at once (src/gpu_host.cpp).
     for (const auto& [name, value] : {std::pair{"pinyon_shift_fh1_render_fps_limit", "30"},
                                       std::pair{"gpu_read_pointer_publish_dwords", "1024"},
                                       std::pair{"clear_memory_page_state", "false"},
                                       std::pair{"spirv_implicit_lod_2d", "true"},
                                       std::pair{"spirv_fast_pixel_math", "true"},
-                                      std::pair{"fh1_untile_predicated_tiling", "true"}}) {
+                                      std::pair{"fh1_untile_predicated_tiling", "true"},
+                                      std::pair{"fh1_readback_resolve_sizes",
+                                                "32x512,512x256,256x128"}}) {
       if (rex::cvar::GetFlagSource(name) == rex::cvar::Source::kDefault) {
         rex::cvar::SetFlagByName(name, value);
       }
