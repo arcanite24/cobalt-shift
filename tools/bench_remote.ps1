@@ -27,7 +27,10 @@ param(
     # -Seconds window). -Rounds pairs of -Window-second windows per switch.
     [string[]]$Switch = @(),
     [int]$Rounds = 6,
-    [int]$Window = 6
+    [int]$Window = 6,
+    # With -Switch: measure in the moving race (the race AI drives) instead of
+    # on the frozen grid. ABBA rounds cancel the race's slow drift.
+    [switch]$Moving
 )
 
 # bench_race.ps1 for another machine on the LAN (the low-end target is
@@ -73,7 +76,8 @@ $userSetup = 'Remove-Item C:\cobalt\user_root.txt -ErrorAction SilentlyContinue'
 if ($Route -eq 'season') {
     $user = 'C:\cobalt\user-season'
     $arguments += '--cobalt_ai_player=true'
-    if ($Switch) { $arguments += '--cobalt_freeze_grid_at=9', "--cobalt_live_file=$user\live.txt" }
+    if ($Switch -and -not $Moving) { $arguments += '--cobalt_freeze_grid_at=9' }
+    if ($Switch) { $arguments += "--cobalt_live_file=$user\live.txt" }
     if (-not $PSBoundParameters.ContainsKey('RaceWait')) { $RaceWait = 240 }
     $keep = if ($KeepCache) { "Move-Item $user\cache C:\cobalt\cache-kept -ErrorAction SilentlyContinue; " } else { '' }
     $restore = if ($KeepCache) { "; Move-Item C:\cobalt\cache-kept $user\cache -ErrorAction SilentlyContinue" } else { '' }
@@ -191,7 +195,7 @@ try {
 if ($Switch) {
     # Each window's mean frame time as fps (tools/ab_windows.py --mean): at the
     # 60 fps cap the median jumps between one and two vblanks.
-    $summary = @("remote A/B $Name on ${HostName} (frozen grid)  args: $($GameArguments -join ' ')")
+    $summary = @("remote A/B $Name on ${HostName} ($(if ($Moving) { "moving race" } else { "frozen grid" }))  args: $($GameArguments -join ' ')")
     if (-not $abLines) { $summary += 'no A/B windows: the game exited before the frozen grid' }
     $abLines | Set-Content -LiteralPath "$stem-windows.txt"
     foreach ($spec in @($abLines | ForEach-Object { ($_ -split ' ')[1] } | Select-Object -Unique)) {

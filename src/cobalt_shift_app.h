@@ -25,6 +25,7 @@ REXCVAR_DEFINE_BOOL(cobalt_low_end, false, "Cobalt",
 #include "scene_size.h"
 #include "disc2_content.h"
 #include "utility_drive.h"
+#include "crash_dump.h"
 
 class CobaltShiftApp : public rex::ReXApp {
  public:
@@ -188,6 +189,7 @@ class CobaltShiftApp : public rex::ReXApp {
   // FM3 streams replays to cache: (FM3-QUIRKS Q8).
   // The scripted pad is added before any guest thread polls input.
   void OnPreLaunchModule() override {
+    cobalt::InstallCrashDump(user_data_root());
     cobalt::MountUtilityDrive(runtime(), user_data_root());
     cobalt::InstallDisc2Content(runtime(), game_data_root());
     cobalt::InstallPadScript(

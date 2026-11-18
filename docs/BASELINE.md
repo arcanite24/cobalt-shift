@@ -958,7 +958,11 @@ seen for the first time. So the fault is most likely in the driver's pipeline
 or first-scene setup. It doesn't occur on multivac. The driver DLL is dated November 2025 (Gen9
 GPUs such as the UHD 620 are on Intel's legacy branch), so a newer driver may
 not exist; the next step if it keeps happening is a run with the Vulkan
-validation layer to see the call that faults.
+validation layer to see the call that faults. The build now writes a
+minidump on a crash (`src/crash_dump.cpp`, `cobalt_crash_dump`, on by
+default) to the user data folder, and `tools/read_dump.py` reads the faulting
+thread against the linker maps. Five more low-end runs with it (2026-11-18)
+got through, so the fault stands at 2 in 13 runs and no dump yet.
 
 A blindvac check of the paint editor wasn't done: its screenshots show the
 desktop, so the menus would have to be driven blind, and the scripted title
