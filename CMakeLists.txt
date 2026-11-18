@@ -38,6 +38,7 @@ include(cmake/rexglue.cmake)
 set(COBALT_SHIFT_SOURCES
     src/main.cpp
     src/utility_drive.cpp
+    src/disc2_content.cpp
     src/pad_script.cpp
     src/ring_wait.cpp
     src/render_rates.cpp

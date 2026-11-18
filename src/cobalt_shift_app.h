@@ -23,6 +23,7 @@ REXCVAR_DEFINE_BOOL(cobalt_low_end, false, "Cobalt",
 
 #include "pad_script.h"
 #include "scene_size.h"
+#include "disc2_content.h"
 #include "utility_drive.h"
 
 class CobaltShiftApp : public rex::ReXApp {
@@ -157,6 +158,7 @@ class CobaltShiftApp : public rex::ReXApp {
   // The scripted pad is added before any guest thread polls input.
   void OnPreLaunchModule() override {
     cobalt::MountUtilityDrive(runtime(), user_data_root());
+    cobalt::InstallDisc2Content(runtime(), game_data_root());
     cobalt::InstallPadScript(
         static_cast<rex::input::InputSystem*>(runtime()->input_system()));
   }

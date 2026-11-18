@@ -7,7 +7,7 @@ which is git-ignored:
 
     disc/       every file on Disc 1 except $SystemUpdate   (game:\\, d:\\)
     disc2-raw/  Disc 2's files as they are
-    dlc/        Disc 2's content packages, unpacked one folder per package
+    content/    Disc 2's packages as the game installs them (first run)
     codegen/    default.xex, for the generator
 
 Commands:
@@ -147,87 +147,6 @@ class DiscImage:
         return digest.hexdigest().upper()
 
 
-class Stfs:
-    """A CON/LIVE/PIRS package held in memory, read-only."""
-
-    def __init__(self, data: bytes):
-        self.data = data
-        if data[:4] not in (b"LIVE", b"PIRS", b"CON "):
-            raise SetupError("the title update is not an STFS package")
-        self.header_size = struct.unpack_from(">I", data, 0x340)[0]
-        self.content_type = struct.unpack_from(">I", data, 0x344)[0]
-        self.media_id, self.version, self.base_version, self.title_id = struct.unpack_from(
-            ">4I", data, 0x354)
-        volume = data[0x379:0x379 + 0x24]
-        flags = volume[2]
-        self.table_blocks = struct.unpack_from("<H", volume, 3)[0]
-        self.table_start = volume[5] | volume[6] << 8 | volume[7] << 16
-        self.per_table = 1 if flags & 1 else 2
-        self.base = (self.header_size + STFS_BLOCK - 1) & ~(STFS_BLOCK - 1)
-        self.entries = self._file_table()
-
-    def _backing(self, block: int) -> int:
-        base, out = STFS_PER_TABLE, block
-        for _ in range(3):
-            out += ((block + base) // base) * self.per_table
-            if block < base:
-                break
-            base *= STFS_PER_TABLE
-        return out
-
-    def _offset(self, block: int) -> int:
-        return self.base + self._backing(block) * STFS_BLOCK
-
-    def _next(self, block: int) -> int:
-        group = block // STFS_PER_TABLE
-        table = self._backing(group * STFS_PER_TABLE) - self.per_table
-        at = self.base + table * STFS_BLOCK + (block % STFS_PER_TABLE) * 0x18
-        return int.from_bytes(self.data[at + 21:at + 24], "big")
-
-    def _blocks(self, start: int, count: int, contiguous: bool) -> list[int]:
-        if contiguous:
-            return list(range(start, start + count))
-        out, block = [], start
-        for _ in range(count):
-            out.append(block)
-            block = self._next(block)
-        return out
-
-    def _file_table(self) -> list[dict]:
-        raw = b"".join(self.data[self._offset(b):self._offset(b) + STFS_BLOCK]
-                       for b in self._blocks(self.table_start, self.table_blocks, False))
-        entries = []
-        for i in range(0, len(raw), 0x40):
-            entry = raw[i:i + 0x40]
-            if not entry[0]:
-                break
-            flags = entry[0x28]
-            entries.append(dict(
-                name=entry[:flags & 0x3F].decode("latin-1"),
-                directory=bool(flags & 0x80), contiguous=bool(flags & 0x40),
-                valid=int.from_bytes(entry[0x29:0x2C], "little"),
-                allocated=int.from_bytes(entry[0x2C:0x2F], "little"),
-                start=int.from_bytes(entry[0x2F:0x32], "little"),
-                parent=struct.unpack_from(">h", entry, 0x32)[0],
-                size=struct.unpack_from(">I", entry, 0x34)[0]))
-        for entry in entries:
-            parts, parent = [entry["name"]], entry["parent"]
-            while parent != -1:
-                parts.append(entries[parent]["name"])
-                parent = entries[parent]["parent"]
-            entry["path"] = "/".join(reversed(parts))
-        return entries
-
-    def read(self, entry: dict) -> bytes:
-        out = bytearray()
-        for block in self._blocks(entry["start"], entry["allocated"] or entry["valid"],
-                                  entry["contiguous"]):
-            out += self.data[self._offset(block):self._offset(block) + STFS_BLOCK]
-        return bytes(out[:entry["size"]])
-
-
-
-
 def staging_for(target: Path) -> Path:
     staging = target.with_name(target.name + ".extracting")
     if staging.exists():
@@ -287,38 +206,22 @@ def extract_disc(iso: Path) -> None:
 
 
 def extract_disc2(iso: Path) -> None:
-    """Disc 2 holds STFS content packages; each is unpacked into dlc/<name>/."""
+    """Disc 2 holds STFS content packages. They are copied as they are: the
+    game installs them into <game root>/content on its first run (cobalt_disc2_content)."""
     raw = GAME / "disc2-raw"
     staging, listing, _ = copy_disc(iso, raw, ())
     swap_in(staging, raw)
-    target = GAME / "dlc"
-    out = staging_for(target)
-    out.mkdir(parents=True)
     packages = []
     for entry in listing:
         path = raw / entry["path"]
         with path.open("rb") as stream:
             head = stream.read(4)
-        if head not in (b"LIVE", b"PIRS", b"CON "):
+        if head not in (b"LIVE", b"PIRS", b"CON ") or not entry["path"].startswith("Content"):
             continue
-        package = Stfs(path.read_bytes())
-        folder = out / path.name
-        files = 0
-        for item in package.entries:
-            destination = folder / item["path"]
-            if item["directory"]:
-                destination.mkdir(parents=True, exist_ok=True)
-                continue
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_bytes(package.read(item))
-            files += 1
-        packages.append({"package": entry["path"], "title_id": f"{package.title_id:08X}",
-                         "content_type": f"{package.content_type:08X}", "files": files})
-        print(f"dlc: {entry['path']} ({files} files)", flush=True)
-    swap_in(out, target)
+        packages.append({"package": entry["path"], "bytes": path.stat().st_size})
     write_catalog(GAME / "disc2-catalog.json", {"source": iso.name, "packages": packages,
                                                 "files": listing})
-    print(f"disc2: {len(packages)} packages in {target}")
+    print(f"disc2: {len(packages)} packages in {raw}; the game installs them on its first run")
 
 
 def prepare_codegen() -> None:
