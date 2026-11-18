@@ -604,3 +604,20 @@ color target into a 16_16 texture (`c4->t25`, 1X and 4X), and the executor
 had no 16_16 destination. The resolve shader now writes one (pack 7: the
 target's snorm words, the samples averaged), and a Ladera run logs no
 skipped resolves and no draw failures.
+
+## Per-draw constants in VRAM (#17, 2026-11-17)
+
+`--vulkan_device_local_uniform_memory=true` (SDK) puts the per-draw uniform
+pages in host-visible device-local memory (Resizable BAR on multivac's RTX
+4080: memory type 4) instead of host-cached system memory (type 3), as
+FM3-ReGPU's VRAM upload ring does. Uncapped grid on multivac
+(`pinyon_shift_fh1_render_fps_limit=180`, no vsync), alternating:
+
+| Run | off | on |
+|---|---|---|
+| 1 | 262.3 fps, 13.99 ms CPU/frame | 251.7 fps, 14.21 ms |
+| 2 | 247.0 fps, 15.06 ms | 255.7 fps, 14.47 ms |
+
+No difference beyond run-to-run noise: the grid is limited by the CPU
+(about 3.8 cores busy), not by the GPU reading constants over PCIe. On the
+UHD 620 all memory is already device-local. The switch stays off.
