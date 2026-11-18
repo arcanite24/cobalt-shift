@@ -212,10 +212,7 @@ class CobaltShiftApp : public rex::ReXApp {
 
   // The image is in memory and no guest code has run: the scene size (#23)
   // edits its static tiling records here.
-  void OnPostLoadXexImage() override {
-    cobalt::InstallCrashDump({});  // again: logs a filter set since startup
-    cobalt::ApplySceneSize();
-  }
+  void OnPostLoadXexImage() override { cobalt::ApplySceneSize(); }
 
   // --perf_log_csv=<path> writes one row of the SDK's counters per frame;
   // the SDK leaves opening it to the app.

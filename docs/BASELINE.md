@@ -212,8 +212,8 @@ frame loop runs, but nothing is displayed. The build goes to `C:\cobalt\bin`
 with an app-local VC++ runtime, and the disc to `C:\cobalt\game\disc`. Vulkan
 lists the NVIDIA 930MX too, and the SDK picks it by default. The one run on it
 (started in the interactive session) stopped logging during startup, so the
-bench passes `--vulkan_device=0` to use the UHD 620 (that was a driver fault,
-fixed later: "The NVIDIA 930MX on blindvac"). Session 0 shows nothing,
+bench passes `--vulkan_device=0` to use the UHD 620. Since the presenter
+change in "The NVIDIA 930MX on blindvac" it starts and runs there too. Session 0 shows nothing,
 so these numbers don't include presentation, and nothing yet checks the
 UHD 620's image.
 
@@ -1074,13 +1074,26 @@ both windows in the race, 1,814 and 1,876 draws a frame):
 | UHD 620 (`--vulkan_device=0`) | 47.2 | 17.09 | 33.53 | 33.85 | 390 | 20.9 |
 | 930MX (`--vulkan_device=1`) | 55.1 | 16.75 | 33.10 | 33.71 | 143 | 17.6 |
 
-The 930MX is 17 % faster with a third of the long frames, in session 0 with
-nothing displayed; on the desktop each frame also crosses to the UHD 620 to
-be shown, which these numbers don't include. One pair in a moving race, so
-the size is approximate; the direction is clear.
+Headless (session 0, nothing displayed) the 930MX is 17 % faster with a
+third of the long frames. On the desktop (`-Interactive`, the CobaltBench
+task in the signed-in session, a 1920x1080 swapchain), where each 930MX frame
+is copied to the UHD 620 to be shown, it boots and runs, but the order flips:
 
-The intermittent Intel fault above hasn't recurred: 12 more cold-cache
-low-end boots on the UHD 620 (`--vulkan_device=0`) got past the first 3D
-scene, for 0 faults in about 20 runs since e7382ee. At its earlier rate (2 in
-13) a clean streak that long has about a 4 % chance, so it is likely gone
-or much rarer on later builds; WER will keep a dump if it returns.
+| GPU, desktop | fps | p50 | p95 | p99 | frames > 20 / 34 / 50 ms | cores |
+|---|---|---|---|---|---|---|
+| UHD 620 | 43.5 | 17.64 | 33.61 | 33.92 | 503 / 10 / 1 | 2.32 |
+| 930MX | 41.2 | 18.18 | 33.95 | 50.06 | 538 / 57 / 16 | 3.23 |
+
+The cross-adapter copy costs the 930MX about a core and its p99. So on
+blindvac `--vulkan_device=0` is the better setting by about 5 %; the default
+keeps the SDK's discrete-first choice, which is right for any stronger
+Optimus GPU and now starts instead of crashing on this one. One run each.
+
+The intermittent Intel fault above wasn't reproduced: 12 more cold-cache
+low-end boots on the UHD 620 (`tools/boot_hunt_remote.ps1 -Extra
+--vulkan_device=0`, to the career hub at about 135 s) all ran, and no
+benchmark run since has faulted (about 8). The hunt boots weren't the
+configuration of the two faulting runs, which were `bench_remote.ps1`
+season runs with `--perf_log_csv` and `--cobalt_ai_player=true` into the
+race, so this doesn't show the fault is gone. Its cause is unknown; WER
+LocalDumps on blindvac will keep a dump if it returns.

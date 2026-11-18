@@ -4,13 +4,13 @@
 // memory faults it knows) writes <user data root>/crash-<time>.dmp with the
 // threads' stacks and the module list, then lets Windows end the process as
 // before. tools/read_dump.py reads the faulting thread from it. It is
-// installed at the first app hook, before the GPU device exists (writing next
-// to the executable until the user data folder is known), and again once the
-// image is loaded, since something in the process replaces it in between.
+// installed at the first app hook, before the GPU device exists, writing next
+// to the executable until the user data folder is known.
 // --cobalt_crash_test=true checks it. A fault inside the NVIDIA driver on
-// blindvac still never reached it; Windows Error Reporting's LocalDumps (a
-// registry key per executable) caught that one, so it is the collector for
-// driver faults (docs/BASELINE.md, "The NVIDIA 930MX on blindvac").
+// blindvac never reached it, for a reason not found; Windows Error
+// Reporting's LocalDumps (a registry key per executable) caught that one, so
+// it is the collector for driver faults (docs/BASELINE.md, "The NVIDIA 930MX
+// on blindvac").
 
 #include "crash_dump.h"
 
@@ -74,13 +74,7 @@ void InstallCrashDump(const std::filesystem::path& folder) {
   } else {
     g_folder = folder.wstring();
   }
-  const LPTOP_LEVEL_EXCEPTION_FILTER previous = SetUnhandledExceptionFilter(WriteDump);
-  // Someone else's filter in its place since the last call: logged, since
-  // that filter had kept faults from reaching this one.
-  if (previous && previous != WriteDump) {
-    REXLOG_WARN("crash dump: replaced another unhandled-exception filter ({})",
-                reinterpret_cast<const void*>(previous));
-  }
+  SetUnhandledExceptionFilter(WriteDump);
   if (REXCVAR_GET(cobalt_crash_test) && !folder.empty()) {
     REXLOG_WARN("crash dump: crashing on purpose (cobalt_crash_test)");
     *static_cast<volatile int*>(nullptr) = 1;
