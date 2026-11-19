@@ -26,6 +26,9 @@ Disc 2 is optional. With it, the first run installs its eight content packages (
 and tracks, 3.4 GB) into `.local/game/content`, which every profile shares, and the game no
 longer asks for the disc. `--cobalt_disc2_content=false` hides them again.
 
+What this port, Pinyon Shift and Lavender Shift learned along the way is collected in
+[Recompiling Xbox 360 Games](https://neri.deimos.studio/recomp/).
+
 ## Licence
 
 Only independently authored project files are licensed under the
